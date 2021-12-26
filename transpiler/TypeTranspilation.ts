@@ -23,7 +23,7 @@ function generateRecord(
         writer.appendSeparated(
             sortBy(optionalProperties, (p) => p.name),
             () => writer.appendLine(","),
-            (p) => writer.append(`${p.type}? ${p.name} = null`)
+            (p) => writer.append(`${p.type} ${p.name} = null`)
         );
     });
     writer.appendLine(")");
@@ -72,7 +72,8 @@ export function transpileType(typeChecker: ts.TypeChecker, writer: CodeWriter, n
                     throw new TranspilationError(m, "Only immutable types are supported. Add the `readonly` keyword.");
                 }
 
-                return { name: m.name.text, type: toCSharpType(typeChecker, m.type), isOptional: !!m.questionToken };
+                const isOptional = !!m.questionToken;
+                return { name: m.name.text, type: toCSharpType(typeChecker, m.type, isOptional), isOptional };
             })
         );
     } else if (ts.isUnionTypeNode(node.type)) {
@@ -92,47 +93,55 @@ export function transpileType(typeChecker: ts.TypeChecker, writer: CodeWriter, n
     }
 }
 
-export function toCSharpType(typeChecker: ts.TypeChecker, node: ts.TypeNode): string {
-    const type = typeChecker.getTypeFromTypeNode(node);
-    if (!type) {
-        throw new TranspilationError(node, "Unable to determine type.");
+export function toCSharpType(typeChecker: ts.TypeChecker, node: ts.TypeNode, ensureNullable: boolean = false) {
+    let csharpType = nodeToCSharpType(node);
+    if (ensureNullable && !csharpType.endsWith("?")) {
+        csharpType += "?";
     }
+    return csharpType;
 
-    if (type.isUnion() && type.aliasSymbol) {
-        const unionType = type as ts.UnionType;
-        const canBeNull = !!unionType.types.find((t) => (t.flags & ts.TypeFlags.Null) === ts.TypeFlags.Null);
-
-        if (canBeNull) {
-            return `${type.aliasSymbol.name}?`;
-        }
-    }
-
-    if (ts.isUnionTypeNode(node)) {
-        const [nullTypes, otherTypes] = partition(
-            node.types,
-            (t) => ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword
-        );
-        if (nullTypes.length !== 1 || otherTypes.length !== 1) {
-            throw new TranspilationError(node, "Only union types of the form `T | null` are supported.");
+    function nodeToCSharpType(node: ts.TypeNode): string {
+        const type = typeChecker.getTypeFromTypeNode(node);
+        if (!type) {
+            throw new TranspilationError(node, "Unable to determine type.");
         }
 
-        return `${toCSharpType(typeChecker, otherTypes[0])}?`;
-    } else if (ts.isArrayTypeNode(node)) {
-        return `${toCSharpType(typeChecker, node.elementType)}[]`;
-    } else if (ts.isParenthesizedTypeNode(node)) {
-        return toCSharpType(typeChecker, node.type);
-    } else {
-        const name = node.getText();
-        switch (name) {
-            case "boolean":
-                return "bool";
-            case "number":
-                throw new TranspilationError(
-                    node,
-                    "Type `number` is unsupported. Use one of the explicit types `int`, `short`, ..."
-                );
-            default:
-                return name as string;
+        if (type.isUnion() && type.aliasSymbol) {
+            const unionType = type as ts.UnionType;
+            const canBeNull = !!unionType.types.find((t) => (t.flags & ts.TypeFlags.Null) === ts.TypeFlags.Null);
+
+            if (canBeNull) {
+                return `${type.aliasSymbol.name}?`;
+            }
+        }
+
+        if (ts.isUnionTypeNode(node)) {
+            const [nullTypes, otherTypes] = partition(
+                node.types,
+                (t) => ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword
+            );
+            if (nullTypes.length !== 1 || otherTypes.length !== 1) {
+                throw new TranspilationError(node, "Only union types of the form `T | null` are supported.");
+            }
+
+            return `${nodeToCSharpType(otherTypes[0])}?`;
+        } else if (ts.isArrayTypeNode(node)) {
+            return `${nodeToCSharpType(node.elementType)}[]`;
+        } else if (ts.isParenthesizedTypeNode(node)) {
+            return nodeToCSharpType(node.type);
+        } else {
+            const name = node.getText();
+            switch (name) {
+                case "boolean":
+                    return "bool";
+                case "number":
+                    throw new TranspilationError(
+                        node,
+                        "Type `number` is unsupported. Use one of the explicit types `int`, `short`, ..."
+                    );
+                default:
+                    return name as string;
+            }
         }
     }
 }

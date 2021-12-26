@@ -238,7 +238,13 @@ function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, no
                 writer.append("null");
             }
         } else if (ts.isJsxText(node)) {
-            writer.append(`JsxElement.Create("${node.getText().replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`);
+            writer.append(
+                `JsxElement.Create("${node
+                    .getText()
+                    .replace(/\\/g, "\\\\")
+                    .replace(/"/g, '\\"')
+                    .replace(/\r|\n/g, "")}")`
+            );
         } else {
             throw new TranspilationError(node, `Unsupported language feature.`);
         }

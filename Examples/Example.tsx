@@ -25,15 +25,35 @@ type TestProps = {
     readonly x: boolean;
     readonly y: int;
     readonly z: JsxNode;
-    readonly children: JsxNode;
+    readonly children?: JsxNode;
 };
 
 function X(a: int | null, b: (string | null)[]): (string | null)[] | null {
     return null;
 }
 
-function Test(props: TestProps): JsxElement {
+function Other(props: TestProps): JsxElement {
     return null;
+}
+
+function Test(props: TestProps): JsxElement {
+    return (
+        <div id="avatar" className="pt-6 pl-3">
+            Herzlich Willkommen, {props.z}!
+            <Other
+                x
+                y={3}
+                z={
+                    <div>
+                        <p>Test</p>
+                    </div>
+                }
+            >
+                Ein Test
+                <Other x={false} y={1} z={<></>}></Other>
+            </Other>
+        </div>
+    );
 }
 
 export function UserAvatar(props: UserAvatarProps): JsxElement {
