@@ -24,6 +24,7 @@ type UserAvatarProps = {
 type TestProps = {
     readonly x: boolean;
     readonly y: int;
+    readonly z: JsxNode;
     readonly children: JsxNode;
 };
 
@@ -60,10 +61,13 @@ export function UserAvatar(props: UserAvatarProps): JsxElement {
 
     return (
         <>
-            <Test x y={3}>
-                <div />
+            <Test x y={3} z={<a href="google">Google</a>}>
+                <div id="1" className="red rounded" />
             </Test>
-            <p> ID: {props.userId} wie geht es dir </p>
+            <p>
+                {" "}
+                ID: {props.userId} wie geht es dir {} "Ha\tllo" {'\t\n\\"'}
+            </p>
             {props.name && <p>{props.name}</p>}
             <img src={props.image ?? "unknown.gif"} />
             {x}

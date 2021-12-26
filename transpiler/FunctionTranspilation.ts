@@ -2,6 +2,7 @@ import { CodeWriter } from "./CodeWriter";
 import ts, { visitNode } from "typescript";
 import { TranspilationError } from "./TranspilationError";
 import { toCSharpType } from "./TypeTranspilation";
+import React from "react";
 
 function generateFunctionSignature(
     writer: CodeWriter,
@@ -20,6 +21,117 @@ function generateFunctionSignature(
     writer.appendLine(")");
 }
 
+function generateJsxElement(
+    writer: CodeWriter,
+    tagName: string,
+    props: { name: string; value: () => void }[],
+    children: (() => void)[]
+) {
+    // Built-in components like <div> or <a> are written out to HTML as-is and are
+    // identified with a lower-case first letter in the tag name. All other components
+    // are expected to have an upper-case first latter.
+    const isBuiltInComponent = tagName[0] === tagName[0].toLowerCase();
+    if (isBuiltInComponent) {
+        generateJsxElementForBuiltIn(writer, tagName, props, children);
+    } else {
+        generateJsxElementForComponent(writer, tagName, props, children);
+    }
+}
+
+function generateJsxElementForBuiltIn(
+    writer: CodeWriter,
+    tagName: string,
+    props: { name: string; value: () => void }[],
+    children: (() => void)[]
+) {
+    writer.appendLine(`JsxElement.CreateHtmlElement(`);
+    writer.appendIndented(() => {
+        writer.appendLine(`"${tagName}",`);
+        writer.append("new (");
+        if (props.length > 0) {
+            writer.append("attributes: new () {");
+            writer.appendSeparated(
+                props,
+                () => writer.append(", "),
+                (p) => {
+                    // The `className` prop is actually called `class` in HTML.
+                    const name = p.name === "className" ? "class" : p.name;
+                    writer.append(`("${name}", `);
+                    p.value();
+                    writer.append(")");
+                }
+            );
+            writer.append("}");
+        }
+        if (props.length > 0 && children.length > 0) {
+            writer.append(", ");
+        }
+        if (children.length > 0) {
+            writer.append("children: ");
+            generateJsxChildren(writer, children);
+        }
+        writer.append(")");
+    });
+    writer.append(")");
+}
+
+function generateJsxElementForComponent(
+    writer: CodeWriter,
+    tagName: string,
+    props: { name: string; value: () => void }[],
+    children: (() => void)[]
+) {
+    // If a non-built-in component has children, we know that the component must define a `children`
+    // prop as otherwise, the type check would fail.
+    const propsWithChildren =
+        children.length === 0
+            ? props
+            : [
+                  ...props,
+                  {
+                      name: "children",
+                      value: () => generateJsxChildren(writer, children),
+                  },
+              ];
+
+    writer.appendLine(`JsxElement.Create<${tagName}Props>(`);
+    writer.appendIndented(() => {
+        writer.appendLine(`${tagName},`);
+        if (propsWithChildren.length === 0) {
+            writer.append("null");
+        } else {
+            writer.append("new (");
+
+            writer.appendSeparated(
+                propsWithChildren,
+                () => writer.append(", "),
+                (p) => {
+                    writer.append(`${p.name}: `);
+                    p.value();
+                }
+            );
+            writer.append(")");
+        }
+    });
+    writer.append(")");
+}
+
+function generateJsxChildren(writer: CodeWriter, children: (() => void)[]) {
+    if (children.length === 1) {
+        children[0]();
+    } else {
+        writer.appendLine("JsxElement.Create(");
+        writer.appendIndented(() => {
+            writer.appendSeparated(
+                children,
+                () => writer.appendLine(", "),
+                (c) => c()
+            );
+        });
+        writer.append(")");
+    }
+}
+
 function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, node: ts.Expression) {
     visitNode(node);
 
@@ -27,7 +139,12 @@ function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, no
         if (ts.isNumericLiteral(node)) {
             writer.append(node.getText());
         } else if (ts.isStringLiteral(node)) {
-            writer.append(node.getText());
+            const text = node.getText();
+            if (text.startsWith("'")) {
+                writer.append(`"${text.slice(1, text.length - 1).replace(/"/, '\\"')}"`);
+            } else {
+                writer.append(text);
+            }
         } else if (node.kind === ts.SyntaxKind.NullKeyword) {
             writer.append("null");
         } else if (node.kind === ts.SyntaxKind.TrueKeyword) {
@@ -102,10 +219,68 @@ function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, no
             ts.forEachChild(node, visitNode);
             writer.append(")");
         } else if (ts.isJsxFragment(node)) {
+            generateJsxElement(writer, "JsxElement.Fragment", [], getJsxChildren(node.children));
+        } else if (ts.isJsxSelfClosingElement(node)) {
+            generateJsxElement(writer, node.tagName.getText(), getJsxAttributes(node.attributes), []);
         } else if (ts.isJsxElement(node)) {
+            generateJsxElement(
+                writer,
+                node.openingElement.tagName.getText(),
+                getJsxAttributes(node.openingElement.attributes),
+                getJsxChildren(node.children)
+            );
+        } else if (ts.isJsxExpression(node)) {
+            if (node.expression) {
+                writer.append("JsxElement.Create(");
+                visitNode(node.expression);
+                writer.append(")");
+            } else {
+                writer.append("null");
+            }
+        } else if (ts.isJsxText(node)) {
+            writer.append(`JsxElement.Create("${node.getText().replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`);
         } else {
             throw new TranspilationError(node, `Unsupported language feature.`);
         }
+    }
+
+    function getJsxAttributes(attributes: ts.JsxAttributes) {
+        return attributes.properties.map((p) => {
+            if (ts.isJsxAttribute(p)) {
+                return {
+                    name: p.name.text,
+                    value: () => {
+                        if (p.initializer) {
+                            if (ts.isJsxExpression(p.initializer)) {
+                                if (!p.initializer.expression) {
+                                    throw new TranspilationError(p.initializer, "Expected an expression");
+                                }
+                                return visitNode(p.initializer.expression);
+                            } else if (ts.isStringLiteral(p.initializer)) {
+                                visitNode(p.initializer);
+                            } else {
+                                throw new TranspilationError(p.initializer, "Unsupported language feature.");
+                            }
+                        } else {
+                            writer.append("true");
+                        }
+                    },
+                };
+            } else if (ts.isJsxSpreadAttribute(p)) {
+                // TODO
+                throw new TranspilationError(p, "Spread attributes are not yet supported.");
+            } else {
+                throw new TranspilationError(node, `Unsupported language feature.`);
+            }
+        });
+    }
+
+    function getJsxChildren(children: ts.NodeArray<ts.JsxChild>) {
+        return !children || children.length === 0
+            ? []
+            : children
+                  .filter((c) => !ts.isJsxText(c) || !c.containsOnlyTriviaWhiteSpaces)
+                  .map((c) => () => visitNode(c));
     }
 }
 
