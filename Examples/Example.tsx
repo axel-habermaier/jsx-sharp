@@ -1,5 +1,3 @@
-import { Guid, int, JsxElement, JsxNode } from "./Types";
-
 //declare function load(userId: Guid): Promise<Status>;
 
 //const X = 3;
@@ -29,25 +27,47 @@ type TestProps = {
     readonly children?: JsxNode;
 };
 
-function X(a: int | null, b: (string | null)[]): (string | null)[] | null {
+function X(a: int | null, b: (string | null)[] | null): (string | null)[] | null {
     return null;
 }
 
 function Other(props: TestProps): JsxElement {
+    X(1, null);
     return (
         <div>
             {props.x && props.z}
             {props.y > 1 || props.children}
+            {props.a?.Select((a) => (
+                <p>{a}</p>
+            ))}
         </div>
     );
 }
+
+//     // deferred context
+//     var x = (JsxElement)(b => b.Append("<div>").Append("hi").Append("</div>"));
+//
+//     // deferred context
+//     return b => b.Append("<div>")
+//         // immediate context
+//         .Append(props.z)
+//         .Append(x)
+//         .Append("Kinder: ")
+//         .Append(props.children)
+//         .Append(props.a.Select(n =>
+//             b.Append("<p>")
+//                 .Append(n)
+//                 .Append("</p>")
+//         ))
+//         .Append("</div>");
 
 function Test(props: TestProps): JsxElement {
     const r = <div>hi!</div>;
 
     return (
-        <div id="avatar" className="pt-6 pl-3">
-            Herzlich Willkommen, {props.z}!
+        <div id="avatar" className="pt-6 pl-3" data-x={'er \tsagt "hallo"!'} data-id={1} data-y>
+            Herzlich Willkommen, {props.z}!<p>Test</p> " \<>Hallo</>
+            {}
             <Other
                 x
                 y={3}
@@ -72,7 +92,7 @@ export function UserAvatar(props: UserAvatarProps): JsxElement | null {
     let b = props.image == "abc";
     let c = false;
     if (!props.image || (!b && !c)) {
-    } else if ((props.infos?.length ?? 0) > 3) {
+    } else if ((props.infos?.Length ?? 0) > 3) {
     } else {
     }
 

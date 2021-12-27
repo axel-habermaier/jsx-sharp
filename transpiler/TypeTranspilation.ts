@@ -11,7 +11,10 @@ function generateRecord(
 ) {
     writer.appendLine(`public readonly record struct ${name}(`);
     writer.appendIndented(() => {
-        const [optionalProperties, mandatoryProperties] = partition(properties, (p) => p.isOptional);
+        const [optionalProperties, mandatoryProperties] = partition(
+            properties,
+            (p) => p.isOptional
+        );
         writer.appendSeparated(
             sortBy(mandatoryProperties, (p) => p.name),
             () => writer.appendLine(","),
@@ -35,16 +38,26 @@ function generateEnum(writer: CodeWriter, name: string, literals: string[]) {
     writer.appendLine(`public record class ${name}`);
     writer.appendLine("{");
     writer.appendIndented(() => {
-        sortBy(literals).forEach((l) => writer.appendLine(`public static ${name} ${l} = new ("${l}");`));
+        sortBy(literals).forEach((l) =>
+            writer.appendLine(`public static ${name} ${l} = new ("${l}");`)
+        );
         writer.appendLine();
         writer.appendLine(`private ${name}(string literal) => _literal = literal;`);
         writer.appendLine();
         writer.appendLine(`private readonly string _literal;`);
         writer.appendLine();
-        writer.appendLine(`public static bool operator ==(${name} lhs, string rhs) => lhs._literal == rhs;`);
-        writer.appendLine(`public static bool operator ==(string lhs, ${name} rhs) => lhs == rhs._literal;`);
-        writer.appendLine(`public static bool operator !=(${name} lhs, string rhs) => lhs._literal != rhs;`);
-        writer.appendLine(`public static bool operator !=(string lhs, ${name} rhs) => lhs != rhs._literal;`);
+        writer.appendLine(
+            `public static bool operator ==(${name} lhs, string rhs) => lhs._literal == rhs;`
+        );
+        writer.appendLine(
+            `public static bool operator ==(string lhs, ${name} rhs) => lhs == rhs._literal;`
+        );
+        writer.appendLine(
+            `public static bool operator !=(${name} lhs, string rhs) => lhs._literal != rhs;`
+        );
+        writer.appendLine(
+            `public static bool operator !=(string lhs, ${name} rhs) => lhs != rhs._literal;`
+        );
     });
     writer.appendLine("}");
     writer.appendLine();
@@ -61,7 +74,10 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
                 }
 
                 if (!ts.isIdentifier(m.name) || m.name.text.includes('"')) {
-                    throw new TranspilationError(m.name, "Only unquoted property names are supported.");
+                    throw new TranspilationError(
+                        m.name,
+                        "Only unquoted property names are supported."
+                    );
                 }
 
                 if (!m.type) {
@@ -69,7 +85,10 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
                 }
 
                 if (!m.modifiers?.find((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword)) {
-                    throw new TranspilationError(m, "Only immutable types are supported. Add the `readonly` keyword.");
+                    throw new TranspilationError(
+                        m,
+                        "Only immutable types are supported. Add the `readonly` keyword."
+                    );
                 }
 
                 const isOptional = !!m.questionToken;
@@ -82,7 +101,10 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
             node.name.text,
             node.type.types.map((t) => {
                 if (!ts.isLiteralTypeNode(t) || !ts.isStringLiteral(t.literal)) {
-                    throw new TranspilationError(t, "Only unions of string literals are supported.");
+                    throw new TranspilationError(
+                        t,
+                        "Only unions of string literals are supported."
+                    );
                 }
 
                 return t.literal.text;
@@ -107,7 +129,10 @@ export function toCSharpType(node: ts.TypeNode, ensureNullable: boolean = false)
                 (t) => ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword
             );
             if (nullTypes.length !== 1 || otherTypes.length !== 1) {
-                throw new TranspilationError(node, "Only union types of the form `T | null` are supported.");
+                throw new TranspilationError(
+                    node,
+                    "Only union types of the form `T | null` are supported."
+                );
             }
 
             return `${nodeToCSharpType(otherTypes[0])}?`;

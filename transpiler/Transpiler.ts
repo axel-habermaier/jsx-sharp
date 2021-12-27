@@ -3,13 +3,20 @@ import { TranspilationError } from "./TranspilationError";
 import { transpileModule } from "./ModuleTranspilation";
 
 function watchMain() {
-    const configPath = ts.findConfigFile("./", ts.sys.fileExists, "tsconfig.json");
+    const configPath = ts.findConfigFile("./Examples", ts.sys.fileExists, "tsconfig.json");
     if (!configPath) {
         throw new Error("Could not find a valid 'tsconfig.json'.");
     }
 
     const createProgram = ts.createSemanticDiagnosticsBuilderProgram;
-    const host = ts.createWatchCompilerHost(configPath, {}, ts.sys, createProgram, reportDiagnostic, reportDiagnostic);
+    const host = ts.createWatchCompilerHost(
+        configPath,
+        {},
+        ts.sys,
+        createProgram,
+        reportDiagnostic,
+        reportDiagnostic
+    );
 
     const originalAfterProgramCreate = host.afterProgramCreate;
     host.afterProgramCreate = (programBuilder) => {
@@ -20,7 +27,6 @@ function watchMain() {
             .getSourceFiles()
             .filter((f) => f.fileName.endsWith(".tsx"))
             .map((f) => {
-                const start = performance.now();
                 try {
                     transpileModule(f);
                 } catch (e: unknown) {
@@ -34,8 +40,6 @@ function watchMain() {
                             code: 7777,
                         });
                     }
-                } finally {
-                    console.log(`Transpiled ${f.fileName} in ${performance.now() - start} ms.`);
                 }
             });
     };
