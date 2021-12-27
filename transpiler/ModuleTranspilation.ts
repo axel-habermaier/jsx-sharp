@@ -5,7 +5,7 @@ import { transpileType } from "./TypeTranspilation";
 import { TranspilationError } from "./TranspilationError";
 import { transpileFunction } from "./FunctionTranspilation";
 
-export function transpileModule(typeChecker: ts.TypeChecker, f: ts.SourceFile) {
+export function transpileModule(f: ts.SourceFile) {
     const writer = new CodeWriter();
 
     writer.appendLine(`namespace PPP.${path.basename(path.dirname(f.fileName))};`);
@@ -20,9 +20,9 @@ export function transpileModule(typeChecker: ts.TypeChecker, f: ts.SourceFile) {
 
     function visitNode(node: ts.Node) {
         if (ts.isTypeAliasDeclaration(node)) {
-            transpileType(typeChecker, writer, node);
+            transpileType(writer, node);
         } else if (ts.isFunctionDeclaration(node)) {
-            transpileFunction(typeChecker, writer, node);
+            transpileFunction(writer, node);
         } else if (ts.isImportDeclaration(node)) {
             // Nothing to do here. Imports are obviously necessary for the TS tooling to work, but we don't care about it.
         } else if (node.kind == ts.SyntaxKind.EndOfFileToken) {

@@ -13,7 +13,6 @@ function watchMain() {
 
     const originalAfterProgramCreate = host.afterProgramCreate;
     host.afterProgramCreate = (programBuilder) => {
-        const typeChecker = programBuilder.getProgram().getTypeChecker();
         originalAfterProgramCreate?.(programBuilder);
 
         // TODO: Can we somehow get only the files that have actually changed?
@@ -21,8 +20,9 @@ function watchMain() {
             .getSourceFiles()
             .filter((f) => f.fileName.endsWith(".tsx"))
             .map((f) => {
+                const start = performance.now();
                 try {
-                    transpileModule(typeChecker, f);
+                    transpileModule(f);
                 } catch (e: unknown) {
                     if (e instanceof TranspilationError) {
                         reportDiagnostic({
@@ -34,6 +34,8 @@ function watchMain() {
                             code: 7777,
                         });
                     }
+                } finally {
+                    console.log(`Transpiled ${f.fileName} in ${performance.now() - start} ms.`);
                 }
             });
     };

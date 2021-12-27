@@ -1,5 +1,3 @@
-import React from "react";
-
 export type byte = number;
 export type sbyte = number;
 export type short = number;
@@ -13,5 +11,14 @@ export type double = number;
 
 export type Guid = string;
 
-export type JsxNode = React.ReactNode | null;
-export type JsxElement = React.ReactElement | null;
+export type JsxKey = string | number;
+export type JsxNode = JsxNode[] | JsxElement | {} | string | number | boolean | null | undefined;
+export type JsxComponent<TProps> = (props: TProps) => JsxElement<any, any> | null;
+export type JsxElement<
+    TProps = any,
+    TComponent extends string | JsxComponent<TProps> = string | JsxComponent<TProps>
+> = {
+    type: TComponent;
+    props: TProps;
+    key: JsxKey | null;
+};

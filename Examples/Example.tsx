@@ -25,6 +25,7 @@ type TestProps = {
     readonly x: boolean;
     readonly y: int;
     readonly z: JsxNode;
+    readonly a?: int[];
     readonly children?: JsxNode;
 };
 
@@ -33,10 +34,17 @@ function X(a: int | null, b: (string | null)[]): (string | null)[] | null {
 }
 
 function Other(props: TestProps): JsxElement {
-    return null;
+    return (
+        <div>
+            {props.x && props.z}
+            {props.y > 1 || props.children}
+        </div>
+    );
 }
 
 function Test(props: TestProps): JsxElement {
+    const r = <div>hi!</div>;
+
     return (
         <div id="avatar" className="pt-6 pl-3">
             Herzlich Willkommen, {props.z}!
@@ -50,13 +58,14 @@ function Test(props: TestProps): JsxElement {
                 }
             >
                 Ein Test
-                <Other x={false} y={1} z={<></>}></Other>
+                {r}
+                <Other x={false} y={1} z={1}></Other>
             </Other>
         </div>
     );
 }
 
-export function UserAvatar(props: UserAvatarProps): JsxElement {
+export function UserAvatar(props: UserAvatarProps): JsxElement | null {
     if (props.status === "loggedOut") {
         return null;
     }
@@ -79,6 +88,8 @@ export function UserAvatar(props: UserAvatarProps): JsxElement {
     ++z;
     z++;
 
+    const o = <Other x y={1} z={<></>} />;
+
     return (
         <>
             <Test x y={3} z={<a href="google">Google</a>}>
@@ -91,6 +102,7 @@ export function UserAvatar(props: UserAvatarProps): JsxElement {
             {props.name && <p>{props.name}</p>}
             <img src={props.image ?? "unknown.gif"} />
             {x}
+            {o}
             <button type="submit"></button>
         </>
     );

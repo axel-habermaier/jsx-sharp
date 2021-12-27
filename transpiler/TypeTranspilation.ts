@@ -50,7 +50,7 @@ function generateEnum(writer: CodeWriter, name: string, literals: string[]) {
     writer.appendLine();
 }
 
-export function transpileType(typeChecker: ts.TypeChecker, writer: CodeWriter, node: ts.TypeAliasDeclaration) {
+export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration) {
     if (ts.isTypeLiteralNode(node.type)) {
         generateRecord(
             writer,
@@ -73,7 +73,7 @@ export function transpileType(typeChecker: ts.TypeChecker, writer: CodeWriter, n
                 }
 
                 const isOptional = !!m.questionToken;
-                return { name: m.name.text, type: toCSharpType(typeChecker, m.type, isOptional), isOptional };
+                return { name: m.name.text, type: toCSharpType(m.type, isOptional), isOptional };
             })
         );
     } else if (ts.isUnionTypeNode(node.type)) {
@@ -93,7 +93,7 @@ export function transpileType(typeChecker: ts.TypeChecker, writer: CodeWriter, n
     }
 }
 
-export function toCSharpType(typeChecker: ts.TypeChecker, node: ts.TypeNode, ensureNullable: boolean = false) {
+export function toCSharpType(node: ts.TypeNode, ensureNullable: boolean = false) {
     let csharpType = nodeToCSharpType(node);
     if (ensureNullable && !csharpType.endsWith("?")) {
         csharpType += "?";
@@ -101,20 +101,6 @@ export function toCSharpType(typeChecker: ts.TypeChecker, node: ts.TypeNode, ens
     return csharpType;
 
     function nodeToCSharpType(node: ts.TypeNode): string {
-        const type = typeChecker.getTypeFromTypeNode(node);
-        if (!type) {
-            throw new TranspilationError(node, "Unable to determine type.");
-        }
-
-        if (type.isUnion() && type.aliasSymbol) {
-            const unionType = type as ts.UnionType;
-            const canBeNull = !!unionType.types.find((t) => (t.flags & ts.TypeFlags.Null) === ts.TypeFlags.Null);
-
-            if (canBeNull) {
-                return `${type.aliasSymbol.name}?`;
-            }
-        }
-
         if (ts.isUnionTypeNode(node)) {
             const [nullTypes, otherTypes] = partition(
                 node.types,

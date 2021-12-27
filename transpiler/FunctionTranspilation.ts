@@ -1,8 +1,7 @@
 import { CodeWriter } from "./CodeWriter";
-import ts, { visitNode } from "typescript";
+import ts from "typescript";
 import { TranspilationError } from "./TranspilationError";
 import { toCSharpType } from "./TypeTranspilation";
-import React from "react";
 
 function generateFunctionSignature(
     writer: CodeWriter,
@@ -132,7 +131,7 @@ function generateJsxChildren(writer: CodeWriter, children: (() => void)[]) {
     }
 }
 
-function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, node: ts.Expression) {
+function transpileExpression(writer: CodeWriter, node: ts.Expression) {
     visitNode(node);
 
     function visitNode(node: ts.Node) {
@@ -176,18 +175,9 @@ function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, no
                 default:
                     throw new TranspilationError(node.operator, "Unsupported operator.");
             }
-            const operandType = typeChecker.getTypeAtLocation(node.operand);
-            if (
-                node.operator === ts.SyntaxKind.ExclamationToken &&
-                (operandType.flags & ts.TypeFlags.Boolean) === 0 &&
-                (operandType.flags & ts.TypeFlags.BooleanLiteral) === 0
-            ) {
-                writer.append("JsxHelper.IsTruthy(");
-                visitNode(node.operand);
-                writer.append(")");
-            } else {
-                visitNode(node.operand);
-            }
+            writer.append("JsxHelper.IsTruthy(");
+            visitNode(node.operand);
+            writer.append(")");
         } else if (ts.isPostfixUnaryExpression(node)) {
             visitNode(node.operand);
             switch (node.operator) {
@@ -290,23 +280,15 @@ function transpileExpression(typeChecker: ts.TypeChecker, writer: CodeWriter, no
     }
 }
 
-function transpileStatements(typeChecker: ts.TypeChecker, writer: CodeWriter, node: ts.Node) {
+function transpileStatements(writer: CodeWriter, node: ts.Node) {
     visitNode(node);
 
     function visitNode(node: ts.Node) {
         if (ts.isIfStatement(node)) {
             writer.append("if (");
-            const expressionType = typeChecker.getTypeAtLocation(node.expression);
-            const isNonBooleanExpression =
-                (expressionType.flags & ts.TypeFlags.Boolean) === 0 &&
-                (expressionType.flags & ts.TypeFlags.BooleanLiteral) === 0;
-            if (isNonBooleanExpression) {
-                writer.append("JsxHelper.IsTruthy(");
-            }
-            transpileExpression(typeChecker, writer, node.expression);
-            if (isNonBooleanExpression) {
-                writer.append(")");
-            }
+            writer.append("JsxHelper.IsTruthy(");
+            transpileExpression(writer, node.expression);
+            writer.append(")");
             writer.append(") ");
             visitNode(node.thenStatement);
             if (node.elseStatement) {
@@ -317,7 +299,7 @@ function transpileStatements(typeChecker: ts.TypeChecker, writer: CodeWriter, no
             writer.append("return");
             if (node.expression) {
                 writer.append(" ");
-                transpileExpression(typeChecker, writer, node.expression);
+                transpileExpression(writer, node.expression);
             }
             writer.appendLine(";");
         } else if (ts.isVariableStatement(node)) {
@@ -345,12 +327,12 @@ function transpileStatements(typeChecker: ts.TypeChecker, writer: CodeWriter, no
                     }
 
                     writer.append(`${d.name.getText()} = `);
-                    transpileExpression(typeChecker, writer, d.initializer);
+                    transpileExpression(writer, d.initializer);
                 }
             );
             writer.appendLine(";");
         } else if (ts.isExpressionStatement(node)) {
-            transpileExpression(typeChecker, writer, node.expression);
+            transpileExpression(writer, node.expression);
             writer.appendLine(";");
         } else if (ts.isBlock(node)) {
             writer.appendLine("{");
@@ -362,7 +344,7 @@ function transpileStatements(typeChecker: ts.TypeChecker, writer: CodeWriter, no
     }
 }
 
-export function transpileFunction(typeChecker: ts.TypeChecker, writer: CodeWriter, node: ts.FunctionDeclaration) {
+export function transpileFunction(writer: CodeWriter, node: ts.FunctionDeclaration) {
     if (!node.name) {
         throw new TranspilationError(node, "Functions must be named.");
     }
@@ -378,7 +360,7 @@ export function transpileFunction(typeChecker: ts.TypeChecker, writer: CodeWrite
     generateFunctionSignature(
         writer,
         node.name.text,
-        toCSharpType(typeChecker, node.type),
+        toCSharpType(node.type),
         node.parameters.map((p) => {
             if (!ts.isIdentifier(p.name)) {
                 throw new TranspilationError(p, "Argument destructuring is unsupported.");
@@ -388,11 +370,11 @@ export function transpileFunction(typeChecker: ts.TypeChecker, writer: CodeWrite
                 throw new TranspilationError(p, "Parameter must be explicitly annotated with a type.");
             }
 
-            return { name: p.name.text, type: toCSharpType(typeChecker, p.type) };
+            return { name: p.name.text, type: toCSharpType(p.type) };
         }),
         !!node.modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
     );
 
-    transpileStatements(typeChecker, writer, node.body);
+    transpileStatements(writer, node.body);
     writer.appendLine();
 }
