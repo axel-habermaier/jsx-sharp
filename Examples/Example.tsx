@@ -22,7 +22,7 @@ type UserAvatarProps = {
 type TestProps = {
     readonly x: boolean;
     readonly y: int;
-    readonly z: JsxNode;
+    readonly z?: JsxNode;
     readonly a?: int[];
     readonly children?: JsxNode;
 };
@@ -31,8 +31,9 @@ function X(a: int | null, b: (string | null)[] | null): (string | null)[] | null
     return null;
 }
 
-function Other(props: TestProps): JsxElement {
+export function Other(props: TestProps): JsxElement {
     X(1, null);
+    let r = props.x && props.z;
     return (
         <div>
             {props.x && props.z}
@@ -61,16 +62,16 @@ function Other(props: TestProps): JsxElement {
 //         ))
 //         .Append("</div>");
 
-function Test(props: TestProps): JsxElement {
+export function Test(props: TestProps): JsxElement {
     const r = <div>hi!</div>;
 
     return (
         <div id="avatar" className="pt-6 pl-3" data-x={'er \tsagt "hallo"!'} data-id={1} data-y>
-            Herzlich Willkommen, {props.z}!<p>Test</p> " \<>Hallo</>
+            Herzlich Willkommen wef, {props.z}!<p>Test</p> " \<>Hallo</>
             {}
             <Other
-                x
-                y={3}
+                x={false}
+                y={0}
                 z={
                     <div>
                         <p>Test</p>
@@ -79,7 +80,7 @@ function Test(props: TestProps): JsxElement {
             >
                 Ein Test
                 {r}
-                <Other x={false} y={1} z={1}></Other>
+                {props.x || <Other x={false} y={1} z={1}></Other>}
             </Other>
         </div>
     );
@@ -97,7 +98,6 @@ export function UserAvatar(props: UserAvatarProps): JsxElement | null {
     }
 
     const x = 1;
-    const y = 2;
 
     let z = 3;
     //  const data = await load(props.userId);
@@ -119,7 +119,7 @@ export function UserAvatar(props: UserAvatarProps): JsxElement | null {
                 {" "}
                 ID: {props.userId} wie geht es dir {} "Ha\tllo" {'\t\n\\"'}
             </p>
-            {props.name && <p>{props.name}</p>}
+            {props.name && props.image && <p>{props.name}</p>}
             <img src={props.image ?? "unknown.gif"} />
             {x}
             {o}

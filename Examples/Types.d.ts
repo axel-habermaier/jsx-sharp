@@ -8,7 +8,9 @@ type long = number;
 type ulong = number;
 type float = number;
 type double = number;
+
 type Guid = string;
+
 type JsxKey = string | number;
 type JsxNode = JsxNode[] | JsxElement | {} | string | number | boolean | null | undefined;
 type JsxComponent<TProps> = (props: TProps) => JsxElement<any, any> | null;
@@ -45,9 +47,7 @@ interface Array<T> extends IEnumerable<T> {
     Length: int;
 }
 
-interface ArrayConstructor {
-    new <T>(arrayLength: number): T[];
-}
+interface ArrayConstructor {}
 
 declare var Array: ArrayConstructor;
 

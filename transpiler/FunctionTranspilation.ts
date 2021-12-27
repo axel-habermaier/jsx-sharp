@@ -39,7 +39,8 @@ function generateJsxChildren(writer: CodeWriter, children: (() => void)[]) {
 function transpileExpression(
     writer: CodeWriter,
     node: ts.Expression,
-    jsxMode: "forbidden" | "immediate" | "deferred"
+    jsxMode: "forbidden" | "immediate" | "deferred",
+    isJsxChain: boolean
 ) {
     visitNode(node);
 
@@ -103,15 +104,30 @@ function transpileExpression(
                     throw new TranspilationError(node.operator, "Unsupported operator.");
             }
         } else if (ts.isBinaryExpression(node)) {
-            visitNode(node.left);
-            if (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken) {
-                writer.append(" == ");
-            } else if (node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
-                writer.append(" != ");
+            if (
+                node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+                node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+            ) {
+                writer.append("JsxHelper.");
+                writer.append(
+                    node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ? "And" : "Or"
+                );
+                writer.append("(");
+                transpileExpression(writer, node.left, "deferred", false);
+                writer.append(", ");
+                transpileExpression(writer, node.right, "deferred", false);
+                writer.append(")");
             } else {
-                writer.append(` ${node.operatorToken.getText()} `);
+                visitNode(node.left);
+                if (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken) {
+                    writer.append(" == ");
+                } else if (node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+                    writer.append(" != ");
+                } else {
+                    writer.append(` ${node.operatorToken.getText()} `);
+                }
+                visitNode(node.right);
             }
-            visitNode(node.right);
         } else if (ts.isPropertyAccessExpression(node)) {
             visitNode(node.expression);
             writer.append(node.questionDotToken ? "?." : ".");
@@ -132,7 +148,7 @@ function transpileExpression(
             if (node.body.kind === ts.SyntaxKind.Block) {
                 transpileStatements(writer, node.body);
             } else {
-                transpileExpression(writer, node.body, "deferred");
+                transpileExpression(writer, node.body, "deferred", isJsxChain);
             }
         } else if (ts.isParameter(node)) {
             writer.append(node.name.getText());
@@ -165,12 +181,6 @@ function transpileExpression(
         // are expected to have an upper-case first latter.
         const isHtmlElement = tagName && tagName[0] === tagName[0].toLowerCase();
 
-        // We can immediately render all HTML elements and all <></> fragments, as we
-        // statically know exactly where their children have to go in the output.
-        // Conversely, we have to defer rendering the children of arbitrary Components,
-        // as we don't know when and where they render their children, if at all.
-        const isImmediateModeElement = isHtmlElement || tagName === "";
-
         if (jsxMode === "deferred") {
             writer.appendLine("(JsxElement)(jsx => jsx");
             writer.appendIndented(() => writeJsxElement());
@@ -180,6 +190,10 @@ function transpileExpression(
         }
 
         function writeJsxElement() {
+            if (!isJsxChain && jsxMode !== "deferred") {
+                writer.append("jsx");
+            }
+
             if (isHtmlElement) {
                 writer.append(`.Append($"<${tagName}`);
                 if (attributes && attributes.properties.length > 0) {
@@ -204,7 +218,7 @@ function transpileExpression(
                                     );
                                 } else {
                                     writer.append('\\"{(');
-                                    transpileExpression(writer, a.value, "forbidden");
+                                    transpileExpression(writer, a.value, "forbidden", isJsxChain);
                                     writer.append(')}\\"');
                                 }
                             }
@@ -235,7 +249,7 @@ function transpileExpression(
                                     if (!a.value) {
                                         writer.append("true");
                                     } else {
-                                        transpileExpression(writer, a.value, "deferred");
+                                        transpileExpression(writer, a.value, "deferred", true);
                                     }
                                 }
                             );
@@ -269,18 +283,20 @@ function transpileExpression(
                         writer.appendLine(
                             `.Append("${c
                                 .getText()
-                                .replace(/\r|\n/g, "")
+                                .replace(/\s\s+/g, " ")
                                 .replace(/\\/g, "\\\\")
                                 .replace(/"/g, '\\"')}")`
                         );
                     } else if (ts.isJsxExpression(c)) {
                         if (c.expression) {
                             writer.append(`.Append(`);
-                            transpileExpression(writer, c.expression, "immediate");
+                            writer.appendIndented(() => {
+                                transpileExpression(writer, c.expression!, "immediate", false);
+                            });
                             writer.appendLine(`)`);
                         }
                     } else {
-                        transpileExpression(writer, c, "immediate");
+                        transpileExpression(writer, c, "immediate", true);
                     }
                 });
         }
@@ -341,7 +357,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
         if (ts.isIfStatement(node)) {
             writer.append("if (");
             writer.append("JsxHelper.IsTruthy(");
-            transpileExpression(writer, node.expression, "forbidden");
+            transpileExpression(writer, node.expression, "forbidden", false);
             writer.append(")");
             writer.append(") ");
             visitNode(node.thenStatement);
@@ -353,7 +369,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
             writer.append("return");
             if (node.expression) {
                 writer.append(" ");
-                transpileExpression(writer, node.expression, "deferred");
+                transpileExpression(writer, node.expression, "deferred", false);
             }
             writer.appendLine(";");
         } else if (ts.isVariableStatement(node)) {
@@ -381,12 +397,12 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
                     }
 
                     writer.append(`${d.name.getText()} = `);
-                    transpileExpression(writer, d.initializer, "deferred");
+                    transpileExpression(writer, d.initializer, "deferred", false);
                 }
             );
             writer.appendLine(";");
         } else if (ts.isExpressionStatement(node)) {
-            transpileExpression(writer, node.expression, "deferred");
+            transpileExpression(writer, node.expression, "deferred", false);
             writer.appendLine(";");
         } else if (ts.isBlock(node)) {
             writer.appendLine("{");

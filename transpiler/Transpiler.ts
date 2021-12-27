@@ -27,6 +27,7 @@ function watchMain() {
             .getSourceFiles()
             .filter((f) => f.fileName.endsWith(".tsx"))
             .map((f) => {
+                const start = performance.now();
                 try {
                     transpileModule(f);
                 } catch (e: unknown) {
@@ -40,6 +41,8 @@ function watchMain() {
                             code: 7777,
                         });
                     }
+                } finally {
+                    console.log(`Transpiled ${f.fileName} in ${performance.now() - start} ms.`);
                 }
             });
     };

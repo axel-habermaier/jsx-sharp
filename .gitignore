@@ -12,10 +12,13 @@ temp.*
 *.tsx.cs
 *.trx
 .eslintcache
+.vs
 
 # Build output
 dist/
 tmp/
+bin/
+obj/
 /build/
 /planfox/shell/build/
 out/
