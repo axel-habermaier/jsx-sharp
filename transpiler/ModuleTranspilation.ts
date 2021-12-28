@@ -22,13 +22,13 @@ export function transpileModule(f: ts.SourceFile) {
         if (ts.isTypeAliasDeclaration(node)) {
             transpileType(writer, node);
         } else if (ts.isFunctionDeclaration(node)) {
-            transpileFunction(writer, node);
+            transpileFunction(writer, node, false);
         } else if (ts.isImportDeclaration(node)) {
             // Nothing to do here. Imports are obviously necessary for the TS tooling to work, but we don't care about it.
         } else if (node.kind == ts.SyntaxKind.EndOfFileToken) {
             // Nothing to do here.
         } else {
-            throw new TranspilationError(node, "Unsupported language feature.");
+            throw new TranspilationError(node, "Unsupported module member.");
         }
     }
 }

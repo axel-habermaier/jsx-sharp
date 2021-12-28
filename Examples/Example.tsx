@@ -37,7 +37,12 @@ type User = {
 };
 
 export function Other(props: TestProps): JsxElement {
-    let users: User[] = [];
+    const users: User[] = [];
+    const l = (a: boolean) => !q(!a);
+
+    function q(b: boolean): boolean {
+        return !b;
+    }
 
     // https://stackoverflow.com/questions/57206717/how-to-use-dbfunction-translation-in-ef-core
     users

@@ -9,10 +9,10 @@ function generateFunctionSignature(
     name: string,
     returnType: string,
     parameters: { name: string; type: string }[],
-    isPublic: boolean
+    visibility: "local" | "public" | "private"
 ) {
-    writer.append(isPublic ? "public" : "private");
-    writer.append(` static ${returnType} ${name}(`);
+    writer.append(visibility !== "local" ? `${visibility} static ` : "");
+    writer.append(`${returnType} ${name}(`);
     writer.appendSeparated(
         parameters,
         () => writer.append(", "),
@@ -67,7 +67,10 @@ function transpileExpression(
                         } else if (ts.isShorthandPropertyAssignment(p)) {
                             writer.append(`${p.name.getText()} = ${p.name.getText()}`);
                         } else {
-                            throw new TranspilationError(p, "Unsupported language feature.");
+                            throw new TranspilationError(
+                                p,
+                                "Unsupported object literal member type."
+                            );
                         }
                     }
                 );
@@ -102,7 +105,10 @@ function transpileExpression(
                     writer.append("!");
                     break;
                 default:
-                    throw new TranspilationError(node.operator, "Unsupported operator.");
+                    throw new TranspilationError(
+                        node.operator,
+                        "Unsupported prefix unary operator."
+                    );
             }
             if (node.operator === ts.SyntaxKind.ExclamationToken) {
                 writer.append("JsxHelper.IsTruthy(");
@@ -121,7 +127,10 @@ function transpileExpression(
                     writer.append("--");
                     break;
                 default:
-                    throw new TranspilationError(node.operator, "Unsupported operator.");
+                    throw new TranspilationError(
+                        node.operator,
+                        "Unsupported postfix unary operator."
+                    );
             }
         } else if (ts.isBinaryExpression(node)) {
             if (
@@ -171,6 +180,9 @@ function transpileExpression(
                 transpileExpression(writer, node.body, "deferred", isJsxChain);
             }
         } else if (ts.isParameter(node)) {
+            if (node.type) {
+                writer.append(`${toCSharpType(node.type)} `);
+            }
             writer.append(node.name.getText());
         } else if (ts.isJsxFragment(node)) {
             transpileJsxElement("", null, node.children);
@@ -183,7 +195,7 @@ function transpileExpression(
                 node.children
             );
         } else {
-            throw new TranspilationError(node, `Unsupported language feature.`);
+            throw new TranspilationError(node, `Unsupported expression.`);
         }
     }
 
@@ -358,7 +370,7 @@ function transpileExpression(
                             } else {
                                 throw new TranspilationError(
                                     p.initializer,
-                                    "Unsupported language feature."
+                                    "Unsupported JSX attribute."
                                 );
                             }
                         } else {
@@ -370,7 +382,7 @@ function transpileExpression(
                 // TODO
                 throw new TranspilationError(p, "Spread attributes are not yet supported.");
             } else {
-                throw new TranspilationError(node, `Unsupported language feature.`);
+                throw new TranspilationError(node, `Unsupported JSX atrribute.`);
             }
         });
     }
@@ -436,13 +448,19 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
             writer.appendLine("{");
             writer.appendIndented(() => ts.forEachChild(node, visitNode));
             writer.appendLine("}");
+        } else if (ts.isFunctionDeclaration(node)) {
+            transpileFunction(writer, node, true);
         } else {
-            throw new TranspilationError(node, `Unsupported language feature.`);
+            throw new TranspilationError(node, `Unsupported statement.`);
         }
     }
 }
 
-export function transpileFunction(writer: CodeWriter, node: ts.FunctionDeclaration) {
+export function transpileFunction(
+    writer: CodeWriter,
+    node: ts.FunctionDeclaration,
+    isLocal: boolean
+) {
     if (!node.name) {
         throw new TranspilationError(node, "Functions must be named.");
     }
@@ -473,7 +491,11 @@ export function transpileFunction(writer: CodeWriter, node: ts.FunctionDeclarati
 
             return { name: p.name.text, type: toCSharpType(p.type) };
         }),
-        !!node.modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+        isLocal
+            ? "local"
+            : !!node.modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+            ? "public"
+            : "private"
     );
 
     transpileStatements(writer, node.body);

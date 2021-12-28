@@ -111,7 +111,7 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
             })
         );
     } else {
-        console.error("Unsupported" + node.getText());
+        throw new TranspilationError(node, "Unsupported type declaration.");
     }
 }
 
