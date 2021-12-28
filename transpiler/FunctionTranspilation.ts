@@ -2,6 +2,7 @@ import { CodeWriter } from "./CodeWriter";
 import ts from "typescript";
 import { TranspilationError } from "./TranspilationError";
 import { toCSharpType } from "./TypeTranspilation";
+import { htmlVoidElements } from "./HtmlVoidElements";
 
 function generateFunctionSignature(
     writer: CodeWriter,
@@ -180,6 +181,7 @@ function transpileExpression(
         // identified with a lower-case first letter in the tag name. All other components
         // are expected to have an upper-case first latter.
         const isHtmlElement = tagName && tagName[0] === tagName[0].toLowerCase();
+        const isVoidElement = htmlVoidElements.includes(tagName);
 
         if (jsxMode === "deferred") {
             writer.appendLine("(JsxElement)(jsx => jsx");
@@ -227,8 +229,13 @@ function transpileExpression(
                 }
                 writer.appendLine('>")');
                 writeJsxChildren();
-                // TODO: Do we have to special-case self-closing tags?
-                writer.appendLine(`.Append("</${tagName}>")`);
+                if (!isVoidElement) {
+                    // Void elements are not allowed to contain children and must either only consist
+                    // of a start tag (that's the code we emit here) or of a self-closing tag
+                    // (optional HTML syntax). Writing an end tag would result in invalid HTML in that case.
+                    // https://dev.w3.org/html5/html-author/#void
+                    writer.appendLine(`.Append("</${tagName}>")`);
+                }
             } else {
                 if (!tagName) {
                     writeJsxChildren();
@@ -274,6 +281,13 @@ function transpileExpression(
         function writeJsxChildren() {
             if (!children) {
                 return;
+            }
+
+            if (isVoidElement && children) {
+                throw new TranspilationError(
+                    node,
+                    "HTML void elements are not allowed to contain children."
+                );
             }
 
             children
