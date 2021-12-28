@@ -22,24 +22,24 @@ function transpileExpression(
             writer.appendSeparated(node.elements, () => writer.append(", "), visitNode);
             writer.append(" }");
         } else if (ts.isObjectLiteralExpression(node)) {
-            writer.append("new() { ");
+            writer.append("new(");
             writer.appendIndented(() => {
                 writer.appendSeparated(
                     node.properties,
                     () => writer.append(", "),
                     (p) => {
                         if (ts.isPropertyAssignment(p)) {
-                            writer.append(`${p.name.getText()} = `);
+                            writer.append(`${p.name.getText()}: `);
                             visitNode(p.initializer);
                         } else if (ts.isShorthandPropertyAssignment(p)) {
-                            writer.append(`${p.name.getText()} = ${p.name.getText()}`);
+                            writer.append(`${p.name.getText()}: ${p.name.getText()}`);
                         } else {
                             throw new TranspilationError(p, "Unsupported object literal member.");
                         }
                     }
                 );
             });
-            writer.append(" }");
+            writer.append(")");
         } else if (node.kind === ts.SyntaxKind.NullKeyword) {
             writer.append("null");
         } else if (node.kind === ts.SyntaxKind.TrueKeyword) {
@@ -49,7 +49,9 @@ function transpileExpression(
         } else if (ts.isIdentifier(node)) {
             writer.append(node.getText());
         } else if (ts.isAsExpression(node)) {
-            writer.append(`(${node.type.getText()})(`);
+            writer.append("(");
+            transpileTypeReference(writer, node.type);
+            writer.append(")(");
             visitNode(node.expression);
             writer.append(")");
         } else if (ts.isNonNullExpression(node)) {
@@ -99,6 +101,29 @@ function transpileExpression(
             visitNode(node.expression);
             writer.append(node.questionDotToken ? "?." : ".");
             writer.append(node.name.text);
+        } else if (ts.isElementAccessExpression(node)) {
+            visitNode(node.expression);
+            if (node.questionDotToken) {
+                writer.append("?");
+            }
+            writer.append("[");
+            visitNode(node.argumentExpression);
+            writer.append("]");
+        } else if (ts.isNewExpression(node)) {
+            writer.append("new ");
+            visitNode(node.expression);
+            if (node.typeArguments) {
+                writer.append("<");
+                writer.appendSeparated(
+                    node.typeArguments,
+                    () => writer.append(", "),
+                    (t) => transpileTypeReference(writer, t)
+                );
+                writer.append(">");
+            }
+            writer.append("(");
+            writer.appendSeparated(node.arguments ?? [], () => writer.append(", "), visitNode);
+            writer.append(")");
         } else if (ts.isParenthesizedExpression(node)) {
             writer.append("(");
             ts.forEachChild(node, visitNode);
@@ -108,6 +133,28 @@ function transpileExpression(
             writer.append("(");
             writer.appendSeparated(node.arguments, () => writer.append(", "), visitNode);
             writer.append(")");
+        } else if (ts.isVariableDeclarationList(node)) {
+            transpileVariableDeclarations(writer, node);
+        } else if (ts.isTemplateExpression(node)) {
+            writer.append('@$"');
+            writer.append(escapeText(node.head.text));
+            writer.appendSeparated(
+                node.templateSpans,
+                () => {},
+                (s) => {
+                    writer.append("{");
+                    visitNode(s.expression);
+                    writer.append("}");
+                    writer.append(escapeText(s.literal.text));
+                }
+            );
+            writer.append('"');
+            function escapeText(text: string) {
+                return text
+                    .replace(/"/g, isJsxChain ? "&quot;" : '""')
+                    .replace(/\{/g, "{{")
+                    .replace(/\}/g, "}}");
+            }
         } else if (ts.isArrowFunction(node)) {
             if (node.modifiers?.find((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
                 writer.append("async ");
@@ -267,29 +314,27 @@ function transpileExpression(
                 );
             }
 
-            children
-                .filter((c) => !ts.isJsxText(c) || !c.containsOnlyTriviaWhiteSpaces)
-                .forEach((c) => {
-                    if (ts.isJsxText(c)) {
-                        writer.appendLine(
-                            `.Append("${c
-                                .getText()
-                                .replace(/\s\s+/g, " ")
-                                .replace(/\\/g, "\\\\")
-                                .replace(/"/g, '\\"')}")`
-                        );
-                    } else if (ts.isJsxExpression(c)) {
-                        if (c.expression) {
-                            writer.append(`.Append(`);
-                            writer.appendIndented(() => {
-                                transpileExpression(writer, c.expression!, "immediate", false);
-                            });
-                            writer.appendLine(`)`);
-                        }
-                    } else {
-                        transpileExpression(writer, c, "immediate", true);
+            children.forEach((c) => {
+                if (ts.isJsxText(c)) {
+                    writer.appendLine(
+                        `.Append("${c
+                            .getFullText()
+                            .replace(/\s\s+/g, " ")
+                            .replace(/\\/g, "\\\\")
+                            .replace(/"/g, '\\"')}")`
+                    );
+                } else if (ts.isJsxExpression(c)) {
+                    if (c.expression) {
+                        writer.append(`.Append(`);
+                        writer.appendIndented(() => {
+                            transpileExpression(writer, c.expression!, "immediate", false);
+                        });
+                        writer.appendLine(`)`);
                     }
-                });
+                } else {
+                    transpileExpression(writer, c, "immediate", true);
+                }
+            });
         }
     }
 
@@ -344,6 +389,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
     visitNode(node);
 
     function visitNode(node: ts.Node) {
+        writeLine(node);
         if (ts.isIfStatement(node)) {
             writer.append("if (");
             writer.append("JsxHelper.IsTruthy(");
@@ -356,6 +402,25 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
                 visitNode(node.elseStatement);
             }
             writer.appendLine();
+        } else if (ts.isForStatement(node)) {
+            writer.append("for (");
+            if (node.initializer) {
+                if (ts.isVariableDeclarationList(node.initializer)) {
+                    transpileVariableDeclarations(writer, node.initializer);
+                } else {
+                    transpileExpression(writer, node.initializer, "deferred", false);
+                }
+            }
+            writer.append("; ");
+            if (node.condition) {
+                transpileExpression(writer, node.condition, "deferred", false);
+            }
+            writer.append("; ");
+            if (node.incrementor) {
+                transpileExpression(writer, node.incrementor, "deferred", false);
+            }
+            writer.append(")");
+            visitNode(node.statement);
         } else if (ts.isReturnStatement(node)) {
             writer.append("return");
             if (node.expression) {
@@ -364,28 +429,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
             }
             writer.appendLine(";");
         } else if (ts.isVariableStatement(node)) {
-            if (node.declarationList.declarations.length > 1) {
-                throw new TranspilationError(
-                    node,
-                    "Multiple declarations are unsupported; split this into separate variable statements."
-                );
-            }
-
-            const declaration = node.declarationList.declarations[0];
-            writer.append(`${declaration.type?.getText() ?? "var"} `);
-            if (!ts.isIdentifier(declaration.name)) {
-                throw new TranspilationError(
-                    declaration.name,
-                    "Expected an identifier. Deconstruction expressions are unsupported."
-                );
-            }
-
-            if (!declaration.initializer) {
-                throw new TranspilationError(declaration.name, "Variable must be initialized.");
-            }
-
-            writer.append(`${declaration.name.getText()} = `);
-            transpileExpression(writer, declaration.initializer, "deferred", false);
+            transpileVariableDeclarations(writer, node.declarationList);
             writer.appendLine(";");
         } else if (ts.isExpressionStatement(node)) {
             transpileExpression(writer, node.expression, "deferred", false);
@@ -400,6 +444,39 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
             throw new TranspilationError(node, `Unsupported statement.`);
         }
     }
+
+    function writeLine(node: ts.Node) {
+        const file = node.getSourceFile();
+        const position = node.getStart(file, true);
+        const line = file.getLineAndCharacterOfPosition(position).line + 1;
+        writer.appendLine();
+        writer.appendLine(`#line ${line} "${file.fileName}"`);
+    }
+}
+
+function transpileVariableDeclarations(writer: CodeWriter, node: ts.VariableDeclarationList) {
+    if (node.declarations.length > 1) {
+        throw new TranspilationError(
+            node,
+            "Multiple declarations are unsupported; split this into separate variable statements."
+        );
+    }
+
+    const declaration = node.declarations[0];
+    writer.append(`${declaration.type?.getText() ?? "var"} `);
+    if (!ts.isIdentifier(declaration.name)) {
+        throw new TranspilationError(
+            declaration.name,
+            "Expected an identifier. Deconstruction expressions are unsupported."
+        );
+    }
+
+    if (!declaration.initializer) {
+        throw new TranspilationError(declaration.name, "Variable must be initialized.");
+    }
+
+    writer.append(`${declaration.name.getText()} = `);
+    transpileExpression(writer, declaration.initializer, "deferred", false);
 }
 
 export function transpileFunction(

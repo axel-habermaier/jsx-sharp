@@ -15,6 +15,11 @@
       <Compile Include="..\Examples\Example2.tsx.cs" Link="Views\Example2.tsx.cs" />
       <Compile Include="..\Examples\Example3.tsx.cs" Link="Views\Example3.tsx.cs" />
       <Compile Include="..\Examples\QuestionnaireEditor.tsx.cs" Link="Views\QuestionnaireEditor.tsx.cs" />
+      <None Include="..\Examples\Document.tsx." Link="Views\Document.tsx" />
+      <None Include="..\Examples\Example.tsx" Link="Views\Example.tsx" />
+      <None Include="..\Examples\Example2.tsx" Link="Views\Example2.tsx" />
+      <None Include="..\Examples\Example3.tsx" Link="Views\Example3.tsx" />
+      <None Include="..\Examples\QuestionnaireEditor.tsx" Link="Views\QuestionnaireEditor.tsx" />
   </ItemGroup>
 
   <ItemGroup>

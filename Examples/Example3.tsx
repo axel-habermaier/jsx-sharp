@@ -1,3 +1,4 @@
+import { UserAvatar } from "./Example";
 import { MyComponent } from "./Example2";
 
 export type OtherComponentProps = {
@@ -15,6 +16,14 @@ export function AboutPage(app: WebApplication): void {
                 <MyComponent name={name + env.EnvironmentName} />
                 <MyComponent name={env.EnvironmentName} />
                 <MyComponent name={name} />
+                <UserAvatar
+                    name=""
+                    canBeNull={null}
+                    recursiveNull={null!}
+                    recursiveNullAll={null}
+                    status="loggedIn"
+                    userId={Guid.Empty}
+                />
             </>
         );
     });

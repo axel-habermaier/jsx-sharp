@@ -133,7 +133,12 @@ export function UserAvatar(props: UserAvatarProps): JsxElement | null {
 
     const x = 1;
 
-    let z = 3;
+    let z 
+    = 3;
+    //  const data = await load(props.userId);
+    //  const data = await load(props.userId);
+
+    //  const data = await load(props.userId);
     //  const data = await load(props.userId);
 
     if (props.image) z = 9;

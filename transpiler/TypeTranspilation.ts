@@ -9,7 +9,7 @@ function generateRecord(
     name: string,
     properties: { name: string; type: () => void; isOptional: boolean }[]
 ) {
-    writer.appendLine(`public readonly record struct ${name}(`);
+    writer.appendLine(`public record class ${name}(`);
     writer.appendIndented(() => {
         const [optionalProperties, mandatoryProperties] = partition(
             properties,
@@ -41,29 +41,11 @@ function generateRecord(
 }
 
 function generateEnum(writer: CodeWriter, name: string, literals: string[]) {
-    writer.appendLine(`public record class ${name}`);
+    writer.appendLine(`public record struct ${name}(string Literal)`);
     writer.appendLine("{");
     writer.appendIndented(() => {
-        sortBy(literals).forEach((l) =>
-            writer.appendLine(`public static ${name} ${l} = new ("${l}");`)
-        );
-        writer.appendLine();
-        writer.appendLine(`private ${name}(string literal) => _literal = literal;`);
-        writer.appendLine();
-        writer.appendLine(`private readonly string _literal;`);
-        writer.appendLine();
-        writer.appendLine(
-            `public static bool operator ==(${name} lhs, string rhs) => lhs._literal == rhs;`
-        );
-        writer.appendLine(
-            `public static bool operator ==(string lhs, ${name} rhs) => lhs == rhs._literal;`
-        );
-        writer.appendLine(
-            `public static bool operator !=(${name} lhs, string rhs) => lhs._literal != rhs;`
-        );
-        writer.appendLine(
-            `public static bool operator !=(string lhs, ${name} rhs) => lhs != rhs._literal;`
-        );
+        writer.appendLine(`public static implicit operator ${name}(string s) => new(s);`);
+        writer.appendLine(`public static implicit operator string(${name} e) => e.Literal;`);
     });
     writer.appendLine("}");
     writer.appendLine();
@@ -153,7 +135,8 @@ export function transpileTypeReference(
                     node,
                     "Only union types of the form `T | null` are supported."
                 );
-            }Promise.resolve
+            }
+            Promise.resolve;
             nodeToCSharpType(otherTypes[0]);
             writer.append(`?`);
             return true;

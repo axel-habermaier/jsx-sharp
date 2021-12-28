@@ -12,8 +12,9 @@ public class JsxResult : IResult
     public async Task ExecuteAsync(HttpContext httpContext)
     {
         httpContext.Response.ContentType = "text/html";
-        await using var writer = new JsxWriter(httpContext.Response.Body);
+        var writer = new JsxWriter();
         _element(writer);
+        await writer.WriteTo(httpContext.Response);
     }
 
 
