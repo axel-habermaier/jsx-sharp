@@ -1,16 +1,20 @@
-﻿using System.Text;
+﻿namespace JsxSharp.JsxRuntime;
 
-namespace Jsx.Jsx;
-
-public class JsxWriter
+public class JsxWriter : IAsyncDisposable
 {
-    private readonly StringBuilder _builder = new();
+    private readonly StreamWriter _writer;
+
+    public JsxWriter(Stream stream)
+    {
+        _writer = new StreamWriter(stream);
+        _writer.Write("<!DOCTYPE html>");
+    }
 
     public JsxWriter Append(string? s)
     {
         if (s != null)
         {
-            _builder.Append(s);
+            _writer.Write(s);
         }
 
         return this;
@@ -42,9 +46,9 @@ public class JsxWriter
 
     public JsxWriter Append<T>(T? t) where T : struct => Append(t?.ToString());
 
-    public JsxWriter Append(JsxElement? element)
+    public JsxWriter Append(JsxElement element)
     {
-        element?.Invoke(this);
+        element(this);
         return this;
     }
 
@@ -71,5 +75,8 @@ public class JsxWriter
         return this;
     }
 
-    public override string ToString() => _builder.ToString();
+    public ValueTask DisposeAsync()
+    {
+        return _writer.DisposeAsync();
+    }
 }

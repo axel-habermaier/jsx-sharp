@@ -4,18 +4,20 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>JsxSharp</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-      <Using Include="Jsx.Jsx" />
+      <Using Include="JsxSharp.JsxRuntime" />
+      <Using Include="JsxSharp.JsxRuntime.JsxResult" Static="true" />
+      <Compile Include="..\Examples\Document.tsx.cs" Link="Views\Document.tsx.cs" />
       <Compile Include="..\Examples\Example.tsx.cs" Link="Views\Example.tsx.cs" />
       <Compile Include="..\Examples\Example2.tsx.cs" Link="Views\Example2.tsx.cs" />
       <Compile Include="..\Examples\Example3.tsx.cs" Link="Views\Example3.tsx.cs" />
+      <Compile Include="..\Examples\QuestionnaireEditor.tsx.cs" Link="Views\QuestionnaireEditor.tsx.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
-    <Folder Include="Views\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 

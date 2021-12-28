@@ -9,6 +9,7 @@
         "inlineSourceMap": true,
         "allowJs": false,
         "jsx": "react-jsx",
+        "experimentalDecorators": true,
         "moduleResolution": "node",
         "forceConsistentCasingInFileNames": true,
         "noImplicitReturns": true,

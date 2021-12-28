@@ -59,3 +59,25 @@ interface IEnumerable<T> {
     OrderBy<U>(predicate: (item: T) => U): IEnumerable<T>;
     ToArray(): T[];
 }
+
+interface Task<T> {
+    /**
+     * @deprecated This method does NOT exist at run-time and is only provided so that the TypeScript compiler does not complain about the use of `await`. Use `ContinueWith` instead.
+     */
+    then<TResult1 = T, TResult2 = never>(
+        onfulfilled?: ((value: T) => TResult1) | undefined | null,
+        onrejected?: ((reason: any) => TResult2) | undefined | null
+    ): Task<TResult1 | TResult2>;
+}
+
+interface Promise<T> extends Promise<T> {}
+
+interface IWebHostEnvironment {
+    get EnvironmentName(): string;
+}
+
+interface WebApplication {
+    MapGet<TResult, T extends unknown[]>(route: string, handler: (...arg: T) => TResult): void;
+}
+
+function Jsx(element: JsxElement);

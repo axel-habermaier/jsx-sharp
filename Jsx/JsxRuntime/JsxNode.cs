@@ -1,4 +1,4 @@
-﻿namespace Jsx.Jsx;
+﻿namespace JsxSharp.JsxRuntime;
 
 public abstract record class JsxNode
 {

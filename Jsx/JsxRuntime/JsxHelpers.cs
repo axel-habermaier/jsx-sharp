@@ -1,4 +1,4 @@
-﻿namespace Jsx.Jsx;
+﻿namespace JsxSharp.JsxRuntime;
 
 public class JsxHelper
 {
@@ -18,7 +18,7 @@ public class JsxHelper
     public static bool IsTruthy(short n) => n != 0;
 
     public static bool IsTruthy(int n) => n != 0;
-
+    
     public static bool IsTruthy(uint n) => n != 0;
 
     public static bool IsTruthy(long n) => n != 0;

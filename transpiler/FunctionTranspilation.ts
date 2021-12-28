@@ -1,25 +1,8 @@
 import { CodeWriter } from "./CodeWriter";
 import ts from "typescript";
 import { TranspilationError } from "./TranspilationError";
-import { toCSharpType } from "./TypeTranspilation";
+import { transpileTypeReference } from "./TypeTranspilation";
 import { htmlVoidElements } from "./HtmlVoidElements";
-
-function generateFunctionSignature(
-    writer: CodeWriter,
-    name: string,
-    returnType: string,
-    parameters: { name: string; type: string }[],
-    visibility: "local" | "public" | "private"
-) {
-    writer.append(visibility !== "local" ? `${visibility} static ` : "");
-    writer.append(`${returnType} ${name}(`);
-    writer.appendSeparated(
-        parameters,
-        () => writer.append(", "),
-        (p) => writer.append(`${p.type} ${p.name}`)
-    );
-    writer.appendLine(")");
-}
 
 function transpileExpression(
     writer: CodeWriter,
@@ -69,6 +52,12 @@ function transpileExpression(
             writer.append(`(${node.type.getText()})(`);
             visitNode(node.expression);
             writer.append(")");
+        } else if (ts.isNonNullExpression(node)) {
+            visitNode(node.expression);
+            writer.append("!");
+        } else if (ts.isAwaitExpression(node)) {
+            writer.append("await ");
+            visitNode(node.expression);
         } else if (ts.isPrefixUnaryExpression(node)) {
             writer.append(unaryOperatorMap[node.operator]);
             if (node.operator === ts.SyntaxKind.ExclamationToken) {
@@ -120,6 +109,13 @@ function transpileExpression(
             writer.appendSeparated(node.arguments, () => writer.append(", "), visitNode);
             writer.append(")");
         } else if (ts.isArrowFunction(node)) {
+            if (node.modifiers?.find((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
+                writer.append("async ");
+            }
+            if (node.type) {
+                transpileTypeReference(writer, node.type);
+                writer.append(" ");
+            }
             writer.append("(");
             writer.appendSeparated(node.parameters, () => writer.append(", "), visitNode);
             writer.append(") => ");
@@ -130,7 +126,8 @@ function transpileExpression(
             }
         } else if (ts.isParameter(node)) {
             if (node.type) {
-                writer.append(`${toCSharpType(node.type)} `);
+                transpileTypeReference(writer, node.type);
+                writer.append(" ");
             }
             writer.append(node.name.getText());
         } else if (ts.isJsxFragment(node)) {
@@ -358,6 +355,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
                 writer.append("else ");
                 visitNode(node.elseStatement);
             }
+            writer.appendLine();
         } else if (ts.isReturnStatement(node)) {
             writer.append("return");
             if (node.expression) {
@@ -395,7 +393,7 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
         } else if (ts.isBlock(node)) {
             writer.appendLine("{");
             writer.appendIndented(() => ts.forEachChild(node, visitNode));
-            writer.appendLine("}");
+            writer.append("}");
         } else if (ts.isFunctionDeclaration(node)) {
             transpileFunction(writer, node, true);
         } else {
@@ -424,7 +422,9 @@ export function transpileFunction(
     generateFunctionSignature(
         writer,
         node.name.text,
-        toCSharpType(node.type),
+        () => {
+            transpileTypeReference(writer, node.type!);
+        },
         node.parameters.map((p) => {
             if (!ts.isIdentifier(p.name)) {
                 throw new TranspilationError(p, "Argument destructuring is unsupported.");
@@ -437,17 +437,44 @@ export function transpileFunction(
                 );
             }
 
-            return { name: p.name.text, type: toCSharpType(p.type) };
+            return { name: p.name.text, type: () => transpileTypeReference(writer, p.type!) };
         }),
         isLocal
             ? "local"
             : !!node.modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
             ? "public"
-            : "private"
+            : "private",
+        !!node.modifiers?.find((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
     );
 
     transpileStatements(writer, node.body);
     writer.appendLine();
+    writer.appendLine();
+}
+
+function generateFunctionSignature(
+    writer: CodeWriter,
+    name: string,
+    returnType: () => void,
+    parameters: { name: string; type: () => void }[],
+    visibility: "local" | "public" | "private",
+    isAsync: boolean
+) {
+    writer.append(visibility !== "local" ? `${visibility} static ` : "");
+    if (isAsync) {
+        writer.append("async ");
+    }
+    returnType();
+    writer.append(` ${name}(`);
+    writer.appendSeparated(
+        parameters,
+        () => writer.append(", "),
+        (p) => {
+            p.type();
+            writer.append(` ${p.name}`);
+        }
+    );
+    writer.appendLine(")");
 }
 
 const unaryOperatorMap: Record<ts.PrefixUnaryOperator | ts.PostfixUnaryOperator, string> = {

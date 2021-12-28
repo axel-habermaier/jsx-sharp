@@ -1,7 +1,7 @@
 import { CodeWriter } from "./CodeWriter";
 import ts from "typescript";
 import path from "path";
-import { transpileType } from "./TypeTranspilation";
+import { transpileTypeDeclaration } from "./TypeTranspilation";
 import { TranspilationError } from "./TranspilationError";
 import { transpileFunction } from "./FunctionTranspilation";
 
@@ -22,7 +22,7 @@ export function transpileModule(f: ts.SourceFile) {
 
     function visitNode(node: ts.Node) {
         if (ts.isTypeAliasDeclaration(node)) {
-            transpileType(writer, node);
+            transpileTypeDeclaration(writer, node);
         } else if (ts.isFunctionDeclaration(node)) {
             transpileFunction(writer, node, false);
         } else if (ts.isImportDeclaration(node)) {
@@ -56,16 +56,13 @@ export function transpileModule(f: ts.SourceFile) {
                 );
             }
 
-            const modulePath = getModuleName(node.moduleSpecifier.getText().replace(/"/g, ""));
+            const modulePath = node.moduleSpecifier.getText().replace(/"/g, "");
+            const moduleName = getModuleName(modulePath);
             if (ts.isNamespaceImport(node.importClause.namedBindings)) {
                 const alias = node.importClause.namedBindings.name.getText();
-                writer.appendLine(
-                    `using ${alias} = ${getNamespace(modulePath)}.${getModuleName(modulePath)};`
-                );
+                writer.appendLine(`using ${alias} = ${getNamespace(modulePath)}.${moduleName};`);
             } else if (ts.isNamedImports(node.importClause.namedBindings)) {
-                writer.appendLine(
-                    `using static ${getNamespace(modulePath)}.${getModuleName(modulePath)};`
-                );
+                writer.appendLine(`using static ${getNamespace(modulePath)}.${moduleName};`);
             } else {
                 throw new TranspilationError(node, "Unsupported import declaration.");
             }
@@ -78,5 +75,5 @@ function getNamespace(moduleFilePath: string) {
 }
 
 function getModuleName(moduleFilePath: string) {
-    return path.parse(moduleFilePath).name;
+    return path.parse(moduleFilePath).name + "Module";
 }

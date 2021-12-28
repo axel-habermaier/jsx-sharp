@@ -7,7 +7,7 @@ import { TranspilationError } from "./TranspilationError";
 function generateRecord(
     writer: CodeWriter,
     name: string,
-    properties: { name: string; type: string; isOptional: boolean }[]
+    properties: { name: string; type: () => void; isOptional: boolean }[]
 ) {
     writer.appendLine(`public readonly record struct ${name}(`);
     writer.appendIndented(() => {
@@ -18,7 +18,10 @@ function generateRecord(
         writer.appendSeparated(
             sortBy(mandatoryProperties, (p) => p.name),
             () => writer.appendLine(","),
-            (p) => writer.append(`${p.type} ${p.name}`)
+            (p) => {
+                p.type();
+                writer.append(` ${p.name}`);
+            }
         );
         if (mandatoryProperties.length > 0 && optionalProperties.length > 0) {
             writer.appendLine(",");
@@ -26,7 +29,10 @@ function generateRecord(
         writer.appendSeparated(
             sortBy(optionalProperties, (p) => p.name),
             () => writer.appendLine(","),
-            (p) => writer.append(`${p.type} ${p.name} = null`)
+            (p) => {
+                p.type();
+                writer.append(` ${p.name} = null`);
+            }
         );
     });
     writer.appendLine(")");
@@ -63,7 +69,7 @@ function generateEnum(writer: CodeWriter, name: string, literals: string[]) {
     writer.appendLine();
 }
 
-export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration) {
+export function transpileTypeDeclaration(writer: CodeWriter, node: ts.TypeAliasDeclaration) {
     if (ts.isTypeLiteralNode(node.type)) {
         generateRecord(
             writer,
@@ -92,7 +98,11 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
                 }
 
                 const isOptional = !!m.questionToken;
-                return { name: m.name.text, type: toCSharpType(m.type, isOptional), isOptional };
+                return {
+                    name: m.name.text,
+                    type: () => transpileTypeReference(writer, m.type!, isOptional),
+                    isOptional,
+                };
             })
         );
     } else if (ts.isUnionTypeNode(node.type)) {
@@ -115,14 +125,24 @@ export function transpileType(writer: CodeWriter, node: ts.TypeAliasDeclaration)
     }
 }
 
-export function toCSharpType(node: ts.TypeNode, ensureNullable: boolean = false) {
-    let csharpType = nodeToCSharpType(node);
-    if (ensureNullable && !csharpType.endsWith("?")) {
-        csharpType += "?";
-    }
-    return csharpType;
+export function transpileTypeReference(
+    writer: CodeWriter,
+    node: ts.TypeNode,
+    ensureNullable: boolean = false
+) {
+    const isNullable = nodeToCSharpType(node);
 
-    function nodeToCSharpType(node: ts.TypeNode): string {
+    if (ts.isTypeReferenceNode(node) && node.typeArguments && node.typeArguments.length > 0) {
+        writer.append("<");
+        writer.appendSeparated(node.typeArguments, () => writer.append(", "), nodeToCSharpType);
+        writer.append(">");
+    }
+
+    if (ensureNullable && !isNullable) {
+        writer.append("?");
+    }
+
+    function nodeToCSharpType(node: ts.TypeNode): boolean {
         if (ts.isUnionTypeNode(node)) {
             const [nullTypes, otherTypes] = partition(
                 node.types,
@@ -133,26 +153,41 @@ export function toCSharpType(node: ts.TypeNode, ensureNullable: boolean = false)
                     node,
                     "Only union types of the form `T | null` are supported."
                 );
-            }
-
-            return `${nodeToCSharpType(otherTypes[0])}?`;
+            }Promise.resolve
+            nodeToCSharpType(otherTypes[0]);
+            writer.append(`?`);
+            return true;
         } else if (ts.isArrayTypeNode(node)) {
-            return `${nodeToCSharpType(node.elementType)}[]`;
+            nodeToCSharpType(node.elementType);
+            writer.append(`[]`);
         } else if (ts.isParenthesizedTypeNode(node)) {
-            return nodeToCSharpType(node.type);
+            nodeToCSharpType(node.type);
+        } else if (ts.isTypeReferenceNode(node)) {
+            const name = node.typeName.getText();
+            switch (name) {
+                // Unfortunately, the TypeScript requires `Promise<T>` to be the return type of an async function and we can't use `Task<T>` instead.
+                case "Promise":
+                    writer.append("Task");
+                    break;
+                default:
+                    writer.append(name);
+            }
         } else {
             const name = node.getText();
             switch (name) {
                 case "boolean":
-                    return "bool";
+                    writer.append("bool");
+                    break;
                 case "number":
                     throw new TranspilationError(
                         node,
                         "Type `number` is unsupported. Use one of the explicit types `int`, `short`, ..."
                     );
                 default:
-                    return name as string;
+                    writer.append(name);
             }
         }
+
+        return false;
     }
 }
