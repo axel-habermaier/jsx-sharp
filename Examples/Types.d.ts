@@ -29,7 +29,9 @@ interface Object {
 
 interface Function {}
 
-interface String {}
+interface String {
+    Contains(other: string): boolean;
+}
 
 interface Boolean {}
 
@@ -52,5 +54,8 @@ interface ArrayConstructor {}
 declare var Array: ArrayConstructor;
 
 interface IEnumerable<T> {
-    Select<T, U>(selector: (item: T) => U): IEnumerable<U>;
+    Select<U>(selector: (item: T) => U): IEnumerable<U>;
+    Where(predicate: (item: T) => boolean): IEnumerable<T>;
+    OrderBy<U>(predicate: (item: T) => U): IEnumerable<T>;
+    ToArray(): T[];
 }

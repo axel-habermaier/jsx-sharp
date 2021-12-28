@@ -51,9 +51,28 @@ function transpileExpression(
         } else if (ts.isStringLiteral(node)) {
             writer.append(getStringFromStringLiteral(node));
         } else if (ts.isArrayLiteralExpression(node)) {
-            writer.append("new [] {");
+            writer.append("{ ");
             writer.appendSeparated(node.elements, () => writer.append(", "), visitNode);
-            writer.append("}");
+            writer.append(" }");
+        } else if (ts.isObjectLiteralExpression(node)) {
+            writer.append("new { ");
+            writer.appendIndented(() => {
+                writer.appendSeparated(
+                    node.properties,
+                    () => writer.append(", "),
+                    (p) => {
+                        if (ts.isPropertyAssignment(p)) {
+                            writer.append(`${p.name.getText()} = `);
+                            visitNode(p.initializer);
+                        } else if (ts.isShorthandPropertyAssignment(p)) {
+                            writer.append(`${p.name.getText()} = ${p.name.getText()}`);
+                        } else {
+                            throw new TranspilationError(p, "Unsupported language feature.");
+                        }
+                    }
+                );
+            });
+            writer.append(" }");
         } else if (node.kind === ts.SyntaxKind.NullKeyword) {
             writer.append("null");
         } else if (node.kind === ts.SyntaxKind.TrueKeyword) {
@@ -394,26 +413,21 @@ function transpileStatements(writer: CodeWriter, node: ts.Node) {
                 );
             }
 
-            writer.append("var ");
-            writer.appendSeparated(
-                node.declarationList.declarations,
-                () => writer.append(", "),
-                (d) => {
-                    if (!ts.isIdentifier(d.name)) {
-                        throw new TranspilationError(
-                            d.name,
-                            "Expected an identifier. Deconstruction expressions are unsupported."
-                        );
-                    }
+            const declaration = node.declarationList.declarations[0];
+            writer.append(`${declaration.type?.getText() ?? "var"} `);
+            if (!ts.isIdentifier(declaration.name)) {
+                throw new TranspilationError(
+                    declaration.name,
+                    "Expected an identifier. Deconstruction expressions are unsupported."
+                );
+            }
 
-                    if (!d.initializer) {
-                        throw new TranspilationError(d.name, "Variable must be initialized.");
-                    }
+            if (!declaration.initializer) {
+                throw new TranspilationError(declaration.name, "Variable must be initialized.");
+            }
 
-                    writer.append(`${d.name.getText()} = `);
-                    transpileExpression(writer, d.initializer, "deferred", false);
-                }
-            );
+            writer.append(`${declaration.name.getText()} = `);
+            transpileExpression(writer, declaration.initializer, "deferred", false);
             writer.appendLine(";");
         } else if (ts.isExpressionStatement(node)) {
             transpileExpression(writer, node.expression, "deferred", false);

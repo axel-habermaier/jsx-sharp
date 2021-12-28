@@ -31,7 +31,24 @@ function X(a: int | null, b: (string | null)[] | null): (string | null)[] | null
     return null;
 }
 
+type User = {
+    readonly id: int;
+    readonly name: string;
+};
+
 export function Other(props: TestProps): JsxElement {
+    let users: User[] = [];
+
+    // https://stackoverflow.com/questions/57206717/how-to-use-dbfunction-translation-in-ef-core
+    users
+        .Where((u) => u.id === 1 && u.name.Contains("X"))
+        .OrderBy((u) => u.name)
+        .Select((u) => ({
+            name: u.name,
+            id: u.id,
+        }))
+        .ToArray();
+
     X(1, null);
     let r = props.x && props.z;
     return (

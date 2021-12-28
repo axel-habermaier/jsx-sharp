@@ -29,7 +29,7 @@ public class JsxHelper
 
     public static bool IsTruthy(double n) => n != 0 && !double.IsNaN(n);
 
-    public static object? And(bool lhs, bool rhs) => lhs && rhs;
+    public static bool And(bool lhs, bool rhs) => lhs && rhs;
 
     public static object? And(object? lhs, bool rhs) => IsTruthy(lhs) ? rhs : lhs;
 
@@ -37,7 +37,7 @@ public class JsxHelper
 
     public static object? And(object? lhs, object? rhs) => IsTruthy(lhs) ? rhs : lhs;
 
-    public static object? Or(bool lhs, bool rhs) => lhs || rhs;
+    public static bool Or(bool lhs, bool rhs) => lhs || rhs;
 
     public static object? Or(object? lhs, bool rhs) => IsTruthy(lhs) ? lhs : rhs;
 
