@@ -21,22 +21,6 @@ function generateFunctionSignature(
     writer.appendLine(")");
 }
 
-function generateJsxChildren(writer: CodeWriter, children: (() => void)[]) {
-    if (children.length === 1) {
-        children[0]();
-    } else {
-        writer.appendLine("JsxElement.Create(");
-        writer.appendIndented(() => {
-            writer.appendSeparated(
-                children,
-                () => writer.appendLine(", "),
-                (c) => c()
-            );
-        });
-        writer.append(")");
-    }
-}
-
 function transpileExpression(
     writer: CodeWriter,
     node: ts.Expression,
@@ -55,7 +39,7 @@ function transpileExpression(
             writer.appendSeparated(node.elements, () => writer.append(", "), visitNode);
             writer.append(" }");
         } else if (ts.isObjectLiteralExpression(node)) {
-            writer.append("new { ");
+            writer.append("new() { ");
             writer.appendIndented(() => {
                 writer.appendSeparated(
                     node.properties,
@@ -67,10 +51,7 @@ function transpileExpression(
                         } else if (ts.isShorthandPropertyAssignment(p)) {
                             writer.append(`${p.name.getText()} = ${p.name.getText()}`);
                         } else {
-                            throw new TranspilationError(
-                                p,
-                                "Unsupported object literal member type."
-                            );
+                            throw new TranspilationError(p, "Unsupported object literal member.");
                         }
                     }
                 );
@@ -84,32 +65,12 @@ function transpileExpression(
             writer.append("false");
         } else if (ts.isIdentifier(node)) {
             writer.append(node.getText());
+        } else if (ts.isAsExpression(node)) {
+            writer.append(`(${node.type.getText()})(`);
+            visitNode(node.expression);
+            writer.append(")");
         } else if (ts.isPrefixUnaryExpression(node)) {
-            switch (node.operator) {
-                case ts.SyntaxKind.PlusPlusToken:
-                    writer.append("++");
-                    break;
-                case ts.SyntaxKind.MinusMinusToken:
-                    writer.append("--");
-                    break;
-                case ts.SyntaxKind.PlusToken:
-                    writer.append("+");
-                    break;
-                case ts.SyntaxKind.MinusToken:
-                    writer.append("-");
-                    break;
-                case ts.SyntaxKind.TildeToken:
-                    writer.append("~");
-                    break;
-                case ts.SyntaxKind.ExclamationToken:
-                    writer.append("!");
-                    break;
-                default:
-                    throw new TranspilationError(
-                        node.operator,
-                        "Unsupported prefix unary operator."
-                    );
-            }
+            writer.append(unaryOperatorMap[node.operator]);
             if (node.operator === ts.SyntaxKind.ExclamationToken) {
                 writer.append("JsxHelper.IsTruthy(");
             }
@@ -119,19 +80,7 @@ function transpileExpression(
             }
         } else if (ts.isPostfixUnaryExpression(node)) {
             visitNode(node.operand);
-            switch (node.operator) {
-                case ts.SyntaxKind.PlusPlusToken:
-                    writer.append("++");
-                    break;
-                case ts.SyntaxKind.MinusMinusToken:
-                    writer.append("--");
-                    break;
-                default:
-                    throw new TranspilationError(
-                        node.operator,
-                        "Unsupported postfix unary operator."
-                    );
-            }
+            writer.append(unaryOperatorMap[node.operator]);
         } else if (ts.isBinaryExpression(node)) {
             if (
                 node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
@@ -379,7 +328,6 @@ function transpileExpression(
                     })(),
                 };
             } else if (ts.isJsxSpreadAttribute(p)) {
-                // TODO
                 throw new TranspilationError(p, "Spread attributes are not yet supported.");
             } else {
                 throw new TranspilationError(node, `Unsupported JSX atrribute.`);
@@ -501,3 +449,12 @@ export function transpileFunction(
     transpileStatements(writer, node.body);
     writer.appendLine();
 }
+
+const unaryOperatorMap: Record<ts.PrefixUnaryOperator | ts.PostfixUnaryOperator, string> = {
+    [ts.SyntaxKind.PlusPlusToken]: "++",
+    [ts.SyntaxKind.MinusMinusToken]: "--",
+    [ts.SyntaxKind.PlusToken]: "+",
+    [ts.SyntaxKind.MinusToken]: "-",
+    [ts.SyntaxKind.TildeToken]: "~",
+    [ts.SyntaxKind.ExclamationToken]: "!",
+} as const;

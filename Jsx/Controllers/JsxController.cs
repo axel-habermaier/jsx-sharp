@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PPP.Examples;
+using PPP;
 
 namespace Jsx.Controllers;
 

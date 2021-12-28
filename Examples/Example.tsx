@@ -1,5 +1,8 @@
 //declare function load(userId: Guid): Promise<Status>;
 
+import * as XYZ from "./Example2";
+import { OtherComponent, OtherComponentProps } from "./Example3";
+
 //const X = 3;
 
 //function printId(id: Guid): string {
@@ -48,14 +51,21 @@ export function Other(props: TestProps): JsxElement {
     users
         .Where((u) => u.id === 1 && u.name.Contains("X"))
         .OrderBy((u) => u.name)
-        .Select((u) => ({
-            name: u.name,
-            id: u.id,
-        }))
+        .Select(
+            (u) =>
+                ({
+                    name: u.name,
+                    id: u.id,
+                } as User)
+        )
         .ToArray();
 
     X(1, null);
     let r = props.x && props.z;
+    let my: XYZ.MyComponentProps = { name: "a" };
+    let other: OtherComponentProps = { name: "b" };
+    Test({ x: false, y: 34 });
+
     return (
         <div>
             {props.x && props.z}
@@ -63,6 +73,8 @@ export function Other(props: TestProps): JsxElement {
             {props.a?.Select((a) => (
                 <p>{a}</p>
             ))}
+            <XYZ.MyComponent name="a" />
+            <OtherComponent name="b" />
         </div>
     );
 }

@@ -9,6 +9,8 @@
   <ItemGroup>
       <Using Include="Jsx.Jsx" />
       <Compile Include="..\Examples\Example.tsx.cs" Link="Views\Example.tsx.cs" />
+      <Compile Include="..\Examples\Example2.tsx.cs" Link="Views\Example2.tsx.cs" />
+      <Compile Include="..\Examples\Example3.tsx.cs" Link="Views\Example3.tsx.cs" />
   </ItemGroup>
 
   <ItemGroup>
