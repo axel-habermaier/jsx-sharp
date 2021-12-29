@@ -1,9 +1,11 @@
+using JsxSharp.JsxRuntime3;
 using PPP;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -14,6 +16,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -24,5 +27,6 @@ app.UseEndpoints(endpoints => endpoints.MapControllers());
 
 Example3Module.AboutPage(app);
 QuestionnaireEditorModule.QuestionnaireEditor(app);
+DirectJsx.QuestionnaireEditor(app);
 
 app.Run();

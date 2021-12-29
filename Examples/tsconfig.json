@@ -20,6 +20,7 @@
         "suppressImplicitAnyIndexErrors": true,
         "noUnusedLocals": false,
         "esModuleInterop": true,
+        "noImplicitOverride": true,
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "resolveJsonModule": true,

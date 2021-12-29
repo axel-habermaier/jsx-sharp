@@ -9,7 +9,7 @@ type ulong = number;
 type float = number;
 type double = number;
 
-class Guid {
+declare class Guid {
     __guid: string;
     public static get Empty(): Guid;
     public static get NewGuid(): Guid;
@@ -27,7 +27,7 @@ type JsxElement<
     key: JsxKey | null;
 };
 
-class Object {
+declare class Object {
     public ToString(): string;
 }
 
@@ -57,7 +57,7 @@ interface ArrayConstructor {}
 
 declare var Array: ArrayConstructor;
 
-class IEnumerable<T> {
+declare class IEnumerable<T> {
     Select<U>(selector: (item: T) => U): IEnumerable<U>;
     Where(predicate: (item: T) => boolean): IEnumerable<T>;
     OrderBy<U>(predicate: (item: T) => U): IEnumerable<T>;
@@ -75,7 +75,7 @@ interface Task<T> {
     ): Task<TResult1 | TResult2>;
 }
 
-interface Promise<T> extends Promise<T> {}
+interface Promise<T> extends Task<T> {}
 
 interface IWebHostEnvironment {
     get EnvironmentName(): string;
@@ -86,15 +86,17 @@ interface WebApplication {
     MapPost<TResult, T extends unknown[]>(route: string, handler: (...arg: T) => TResult): void;
 }
 
-function Jsx(element: JsxElement);
+declare function Jsx(element: JsxElement): JsxElement;
 
-class List<T> extends IEnumerable<T> {
+declare class List<T> extends IEnumerable<T> {
     Add(item: T): void;
     Remove(item: T | null): void;
 }
 
-class Results {
-    public static Redirect(url: string): IActionResult;
+interface IResult {}
+
+declare class Results {
+    public static Redirect(url: string): IResult;
 }
 
 type ModelBinder<T> = {

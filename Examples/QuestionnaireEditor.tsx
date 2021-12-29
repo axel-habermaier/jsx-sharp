@@ -12,7 +12,9 @@ export function QuestionnaireEditor(app: WebApplication): void {
     }
 
     app.MapGet("/svelte/{id?}", (id: int | null) => {
-        const current = questionnaires.Where((q) => q.id === id).SingleOrDefault();
+        const current = questionnaires
+            .Where((q) => q.id === id && q.questions !== "")
+            .SingleOrDefault();
 
         return Jsx(
             <Document title="Questionnaire Editor">
