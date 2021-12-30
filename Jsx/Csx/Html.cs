@@ -1,4 +1,4 @@
-﻿/*namespace JsxSharp.Csx;
+﻿namespace JsxSharp.Csx;
 
 using static Html;
 
@@ -147,4 +147,4 @@ public class Controller
     public record class TestProps(bool showHeader, HtmlElement header)
     {
     }
-}*/
+}

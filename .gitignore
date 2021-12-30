@@ -13,6 +13,7 @@ temp.*
 *.trx
 .eslintcache
 .vs
+generated-types.d.ts
 
 # Build output
 dist/

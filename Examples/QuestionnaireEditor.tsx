@@ -15,7 +15,8 @@ export function QuestionnaireEditor(app: WebApplication): void {
         const current = questionnaires
             .Where((q) => q.id === id && q.questions !== "")
             .SingleOrDefault();
-
+        let s = new Dictionary<int, string>();
+        let q = s["hi"] as string;
         return Jsx(
             <Document title="Questionnaire Editor">
                 <h3>Fragebögen</h3>
@@ -66,16 +67,13 @@ export function QuestionnaireEditor(app: WebApplication): void {
         return Results.Redirect("/questionnaire-editor/" + id);
     });
 
-    app.MapPost(
-        "/questionnaire-editor/save",
-        (id: ModelBinder<int>, questions: ModelBinder<string>) => {
-            const q = questionnaires.Where((q) => q.id === id?.Model).SingleOrDefault();
-            questionnaires.Remove(q);
-            questionnaires.Add({
-                id: (id.Model as int | null) ?? 0,
-                questions: questions.Model ?? "",
-            });
-            return Results.Redirect("/questionnaire-editor/" + id?.Model);
-        }
-    );
+    app.MapPost("/questionnaire-editor/save", (id: int, questions: string) => {
+        const q = questionnaires.Where((q) => q.id === id).SingleOrDefault();
+        questionnaires.Remove(q);
+        questionnaires.Add({
+            id: (id as int | null) ?? 0,
+            questions: questions ?? "",
+        });
+        return Results.Redirect("/questionnaire-editor/" + id);
+    });
 }
