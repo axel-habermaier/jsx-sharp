@@ -11,6 +11,9 @@ export function QuestionnaireEditor(app: WebApplication): void {
         questionnaires.Add({ id: i, questions: i.ToString() });
     }
 
+    let a: int[] = null!;
+    let x = a.Select((b) => b);
+
     app.MapGet("/svelte/{id?}", (id: int | null) => {
         const current = questionnaires
             .Where((q) => q.id === id && q.questions !== "")

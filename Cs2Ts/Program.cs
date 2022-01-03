@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Cs2Ts;
 
@@ -6,62 +7,74 @@ var writer = new CodeWriter();
 writer.AppendLine("// Generated code - do not edit!");
 writer.AppendLine();
 
-var allowList = new HashSet<string>
+var types = new List<TsType>
 {
-    "System.Collections.Generic.List`1",
-    "System.Collections.Generic.IEnumerable`1",
-    "System.Collections.Generic.Dictionary`2",
-    "System.Collections.Generic.HashSet`1",
-    "System.Predicate`1",
-    "System.Guid",
-    "System.Byte",
-    "System.SByte",
-    "System.UInt16",
-    "System.Int16",
-    "System.UInt32",
-    "System.Int32",
-    "System.UInt64",
-    "System.Int64",
-    "System.Single",
-    "System.Double",
-    "System.Decimal",
-    "System.Void",
-    "System.Boolean",
-    "System.String",
-    "System.Nullable`1",
-    "System.StringSplitOptions",
-    "System.Object",
-    "System.Enum",
-    "System.Threading.Tasks.Task",
-    "System.Threading.Tasks.Task`1",
-    "System.Threading.Tasks.ValueTask",
-    "System.Threading.Tasks.ValueTask`1",
-    "System.Threading.Tasks.TaskCreationOptions",
-    "System.Threading.CancellationToken",
-    "System.Linq.Enumerable"
+    new(typeof(List<>))
+    {
+        ExtensionsSource = typeof(Enumerable),
+        ExtensionTargetTypes = { typeof(IEnumerable<>) },
+        ImplementedInterfaces = {typeof(IEnumerable<>)},
+        SuppressedMethods = {typeof(List<>).GetMethod("get_Count")!}
+    },
+    new(typeof(IEnumerable<>))
+    {
+        ExtensionsSource = typeof(Enumerable),
+        ExtensionTargetTypes = { typeof(IEnumerable<>) }
+    },
+    new(typeof(Dictionary<,>)),
+    new(typeof(Predicate<>)),
+    new(typeof(Guid)),
+    new(typeof(byte)),
+    new(typeof(sbyte)),
+    new(typeof(ushort)),
+    new(typeof(short)),
+    new(typeof(uint)),
+    new(typeof(int)),
+    new(typeof(ulong)),
+    new(typeof(long)),
+    new(typeof(float)),
+    new(typeof(double)),
+    new(typeof(decimal)),
+    new(typeof(void)),
+    new(typeof(bool)),
+    new(typeof(string)),
+    new(typeof(Nullable<>)),
+    new(typeof(StringSplitOptions)),
+    new(typeof(object)),
+    new(typeof(Enum)),
+    new(typeof(Array)){
+        ExtensionsSource = typeof(Enumerable),
+        ExtensionTargetTypes = { typeof(IEnumerable<>) },
+        ImplementedInterfaces = {typeof(IEnumerable<>)}
+    },
+    new(typeof(Enumerable)),
+    new(typeof(Queryable)),
+    new(typeof(IOrderedEnumerable<>))
+    {
+        ExtensionsSource = typeof(Enumerable),
+        ExtensionTargetTypes = { typeof(IOrderedEnumerable<>), typeof(IEnumerable<>) },
+        ImplementedInterfaces = {typeof(IEnumerable<>)}
+    },
+    new(typeof(IQueryable<>))
+    {
+        ExtensionsSource = typeof(Queryable),
+        ExtensionTargetTypes = { typeof(IQueryable<>) }
+    },
+    new(typeof(IOrderedQueryable<>))
+    {
+        ExtensionsSource = typeof(Queryable),
+        ExtensionTargetTypes = { typeof(IQueryable<>), typeof(IOrderedQueryable<>) }
+    },
+    new(typeof(Task<>)) { MakeGenericsOptional = true },
+    new(typeof(ValueTask<>)) { MakeGenericsOptional = true },
+    new(typeof(CancellationToken))
 };
 
-var knownTypes = AppDomain.CurrentDomain.GetAssemblies()
-    .SelectMany(a => a.GetTypes())
-    .Where(t => t.IsPublic && allowList.Contains(t.FullName ?? ""))
-    .ToHashSet();
+var knownTypes = new HashSet<Type>(types.Select(type => type.Type));
 
-var typesToTranspile = new List<Type>(knownTypes);
-
-foreach (var type in allowList.Where(t1 => knownTypes.All(t2 => t2.FullName != t1)))
+foreach (var tsType in types)
 {
-    Console.WriteLine($"Error: Type '{type}' could not be found.");
-}
-
-foreach (var type in knownTypes.ToArray())
-{
-    CollectBaseTypes(type);
-}
-
-while (typesToTranspile.Count > 0)
-{
-    var type = typesToTranspile[^1];
-    typesToTranspile.RemoveAt(typesToTranspile.Count - 1);
+    var type = tsType.Type;
 
     if (type.IsEnum)
     {
@@ -77,7 +90,7 @@ while (typesToTranspile.Count > 0)
     else if (type.BaseType == typeof(MulticastDelegate))
     {
         writer.Append("declare type ");
-        TranspileTypeReference(writer, type);
+        TranspileTypeReference(writer, type, false);
         writer.Append(" = ");
         TranspileFunctionType(writer, type);
         writer.AppendLine(";");
@@ -92,19 +105,19 @@ while (typesToTranspile.Count > 0)
         }
 
         writer.Append($"{(type.IsInterface ? "interface" : "class")} ");
-        TranspileDeclarationTypeName(writer, type);
-        if (type.BaseType != null && type.BaseType != typeof(ValueType))
+        TranspileDeclarationTypeName(writer, type, tsType.MakeGenericsOptional);
+        if (type.BaseType != null && type.BaseType != typeof(ValueType) && IsKnownType(type.BaseType))
         {
             writer.Append(" extends ");
-            TranspileTypeReference(writer, type.BaseType);
+            TranspileTypeReference(writer, type.BaseType, false);
         }
 
         var genericArguments = type.GetGenericArguments();
-        var interfaces = type.GetInterfaces().Where(IsKnownType).ToArray();
-        if (interfaces.Length > 0)
+        if (tsType.ImplementedInterfaces.Count > 0)
         {
             writer.Append(type.IsInterface ? " extends " : " implements ");
-            writer.AppendSeparated(interfaces, () => writer.Append(", "), i => TranspileTypeReference(writer, i));
+            writer.AppendSeparated(tsType.ImplementedInterfaces, () => writer.Append(", "),
+                i => TranspileTypeReference(writer, i, false));
         }
 
         writer.AppendLine(" {");
@@ -118,10 +131,25 @@ while (typesToTranspile.Count > 0)
                 .Where(IsKnownType)
                 .SelectMany(i => i.GetMethods(BindingFlags.Public | BindingFlags.Instance));
 
+            var extensions = new List<MethodInfo>(tsType.ExtensionsSource != null
+                    ? tsType.ExtensionsSource.GetMethods()
+                        : Array.Empty<MethodInfo>())
+                .Where(m => m.IsStatic && m.GetParameters().Length > 0)
+                .Where(m =>
+                {
+                    var thisParameter = m.GetParameters()[0];
+                    var thisType = thisParameter.ParameterType.IsConstructedGenericType
+                        ? thisParameter.ParameterType.GetGenericTypeDefinition()
+                        : thisParameter.ParameterType;
+
+                    return tsType.ExtensionTargetTypes.Contains(thisType);
+                })
+                .Where(m => m.GetGenericArguments().Length > 0);
+
             writer.AppendSeparated(constructors,
                 () => writer.AppendLine(),
                 c => TranspileMethod(writer, genericArguments, "constructor", false, false, Array.Empty<Type>(),
-                    c.GetParameters(), null));
+                    c.GetParameters(), null, t => t));
 
             if (constructors.Length > 0)
             {
@@ -129,50 +157,48 @@ while (typesToTranspile.Count > 0)
             }
 
             writer.AppendSeparated(
-                ownMethods.Concat(interfaceMethods)
+                ownMethods.Concat(interfaceMethods).Concat(extensions)
+                    .Where(m => !tsType.SuppressedMethods.Contains(m))
                     .DistinctBy(m =>
                     {
                         // We compare strings here to filter out redundant method declarations originating from the
                         // type and its interfaces. At the symbol level, we would have to figure out if some 
                         // generic argument `T` from the class itself or one of its interfaces are the same. At the
                         // syntax level, that's easy.
-                        var returnType = TranspileToString(w => TranspileTypeReference(w, m.ReturnType));
+                        var returnType = TranspileToString(w => TranspileTypeReference(w, m.ReturnType, false));
                         var parameterTypes = m.GetParameters().Select(p =>
-                            TranspileToString(w => TranspileTypeReference(w, p.ParameterType)));
+                            TranspileToString(w => TranspileTypeReference(w, p.ParameterType, false)));
                         return (m.Name, returnType, string.Join(", ", parameterTypes));
                     })
                     .OrderBy(m => m.Name),
                 () => writer.AppendLine(),
-                m => TranspileMethod(writer, genericArguments, m.Name, m.IsSpecialName, m.IsStatic,
-                    m.GetGenericArguments(), m.GetParameters(), m.ReturnType));
+                m =>
+                {
+                    if (m.GetCustomAttribute<ExtensionAttribute>() != null)
+                    {
+                        // We're injecting extension methods
+                        var methodThisType = m.GetGenericArguments()[0];
+                        var typeThisType = type.GetGenericArguments()[0];
+                        TranspileMethod(writer, genericArguments, m.Name, false, false,
+                            m.GetGenericArguments().Skip(1).ToArray(), m.GetParameters().Skip(1).ToArray(), m.ReturnType, t => t == methodThisType ? typeThisType : t);
+                    }
+                    else
+                    {
+                        TranspileMethod(writer, genericArguments, m.Name, m.IsSpecialName, m.IsStatic,
+                            m.GetGenericArguments(), m.GetParameters(), m.ReturnType, t => t);
+                    }
+                });
         });
         writer.AppendLine();
         writer.AppendLine("}");
         writer.AppendLine();
-
-        var extensionMethods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
-                                               BindingFlags.DeclaredOnly)
-            .Where(m => m.GetCustomAttribute<ExtensionAttribute>() != null);
-
-        foreach (var m in extensionMethods)
-        {
-            writer.Append("declare interface ");
-            TranspileDeclarationTypeName(writer, m.GetParameters()[0].ParameterType);
-            writer.AppendLine(" {");
-            writer.AppendIndented(() =>
-            {
-                TranspileMethod(writer, genericArguments, m.Name, false, false, m.GetGenericArguments(), m.GetParameters().Skip(0).ToArray(), m.ReturnType);
-            });
-            writer.AppendLine("}");
-            writer.AppendLine();
-        }
     }
 }
 
 writer.ToFile("../../../../Examples/generated-types.d.ts");
 
 void TranspileMethod(CodeWriter writer, Type[] containingTypeGenericArguments, string name, bool isSpecialName,
-    bool isStatic, Type[] genericArguments, ParameterInfo[] parameters, Type? returnType)
+    bool isStatic, Type[] genericArguments, ParameterInfo[] parameters, Type? returnType, Func<Type, Type> mapType)
 {
     var referencedTypes = parameters.Select(p => p.ParameterType)
         .Concat(returnType == null ? Array.Empty<Type>() : new[] { returnType }).ToArray();
@@ -221,7 +247,7 @@ void TranspileMethod(CodeWriter writer, Type[] containingTypeGenericArguments, s
     }
 
     writer.Append(name);
-    TranspileGenericArguments(writer, genericArguments);
+    TranspileGenericArguments(writer, genericArguments, false);
 
     writer.Append("(");
 
@@ -230,7 +256,7 @@ void TranspileMethod(CodeWriter writer, Type[] containingTypeGenericArguments, s
         writer.AppendSeparated(parameters, () => writer.Append(", "), p =>
         {
             writer.Append($"{(p.Name == "function" ? "func" : p.Name)}: ");
-            TranspileTypeReferenceOrUnknown(writer, p.ParameterType);
+            TranspileTypeReferenceOrUnknown(writer, p.ParameterType, mapType);
         });
     }
 
@@ -238,36 +264,17 @@ void TranspileMethod(CodeWriter writer, Type[] containingTypeGenericArguments, s
     if (!isSetter && returnType != null)
     {
         writer.Append(": ");
-        TranspileTypeReferenceOrUnknown(writer, returnType);
+        TranspileTypeReferenceOrUnknown(writer, returnType, mapType);
     }
 
     writer.Append(";");
 }
 
-void CollectBaseTypes(Type type)
-{
-    if (type.IsValueType || type.IsEnum || type.BaseType == typeof(MulticastDelegate))
-    {
-        return;
-    }
-
-    // We always transpile all base types to get the type hierarchy correct
-    while (type.BaseType != null)
-    {
-        if (knownTypes.Add(type))
-        {
-            typesToTranspile.Add(type);
-        }
-
-        type = type.BaseType;
-    }
-}
-
-void TranspileDeclarationTypeName(CodeWriter writer, Type type)
+void TranspileDeclarationTypeName(CodeWriter writer, Type type, bool makeGenericsOptional)
 {
     if (type == typeof(Array))
     {
-        writer.Append("Array<T = unknown>");
+        writer.Append("Array<T = never>");
     }
     else if (type.IsPrimitive || type == typeof(decimal) || type == typeof(void) || type == typeof(string))
     {
@@ -275,39 +282,44 @@ void TranspileDeclarationTypeName(CodeWriter writer, Type type)
     }
     else if (type.IsConstructedGenericType)
     {
-        TranspileTypeReference(writer, type.GetGenericTypeDefinition());
+        TranspileTypeReference(writer, type.GetGenericTypeDefinition(), makeGenericsOptional);
     }
     else
     {
-        TranspileTypeReference(writer, type);
+        TranspileTypeReference(writer, type, makeGenericsOptional);
     }
 }
 
-void TranspileTypeReferenceOrUnknown(CodeWriter writer, Type type)
+void TranspileTypeReferenceOrUnknown(CodeWriter writer, Type type, Func<Type, Type> mapType)
 {
     if (IsKnownType(type) || type.IsGenericMethodParameter || type.IsGenericTypeParameter)
     {
-        TranspileTypeReference(writer, type);
+        TranspileTypeReference(writer, type, false, mapType);
     }
     else
     {
         writer.Append("unknown /*");
-        TranspileTypeReference(writer, type);
+        TranspileTypeReference(writer, type, false, mapType);
         writer.Append("*/");
     }
 }
 
-void TranspileTypeReference(CodeWriter writer, Type type)
+void TranspileTypeReference(CodeWriter writer, Type type, bool makeGenericsOptional, Func<Type, Type>? mapType = null)
 {
     if (type.IsArray)
     {
-        TranspileTypeReference(writer, type.GetElementType()!);
+        TranspileTypeReference(writer, type.GetElementType()!, makeGenericsOptional, mapType);
         writer.Append("[]");
     }
     else if (type.IsConstructedGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
     {
-        TranspileTypeReference(writer, type.GetGenericArguments()[0]);
+        TranspileTypeReference(writer, type.GetGenericArguments()[0], makeGenericsOptional, mapType);
         writer.Append(" | null");
+    }
+    else if (type.IsConstructedGenericType && type.GetGenericTypeDefinition() == typeof(Expression<>))
+    {
+        // We compile expressions away
+        TranspileFunctionType(writer, type.GetGenericArguments()[0]);
     }
     else if (IsFunctionType(type))
     {
@@ -315,6 +327,7 @@ void TranspileTypeReference(CodeWriter writer, Type type)
     }
     else
     {
+        type = mapType?.Invoke(type) ?? type;
         var name = type.Name switch
         {
             "Byte" => "byte",
@@ -335,16 +348,23 @@ void TranspileTypeReference(CodeWriter writer, Type type)
             { } n => n
         };
         writer.Append(name);
-        TranspileGenericArguments(writer, type.GetGenericArguments());
+        TranspileGenericArguments(writer, type.GetGenericArguments(), makeGenericsOptional);
     }
 }
 
-void TranspileGenericArguments(CodeWriter writer, Type[]? typeArguments)
+void TranspileGenericArguments(CodeWriter writer, Type[]? typeArguments, bool makeGenericsOptional)
 {
     if (typeArguments?.Length > 0)
     {
         writer.Append("<");
-        writer.AppendSeparated(typeArguments, () => writer.Append(", "), t => TranspileTypeReference(writer, t));
+        writer.AppendSeparated(typeArguments, () => writer.Append(", "), t =>
+        {
+            TranspileTypeReference(writer, t, false);
+            if (makeGenericsOptional)
+            {
+                writer.Append(" = unknown");
+            }
+        });
         writer.Append(">");
     }
 }
@@ -359,10 +379,10 @@ void TranspileFunctionType(CodeWriter writer, Type delegateType)
     {
         writer.Append(string.IsNullOrWhiteSpace(p.Name) ? $"arg{i++}" : p.Name);
         writer.Append(": ");
-        TranspileTypeReference(writer, p.ParameterType);
+        TranspileTypeReference(writer, p.ParameterType, false);
     });
     writer.Append(") => ");
-    TranspileTypeReference(writer, invokeMethod.ReturnType);
+    TranspileTypeReference(writer, invokeMethod.ReturnType, false);
 }
 
 string TranspileToString(Action<CodeWriter> write)
@@ -377,6 +397,11 @@ bool IsKnownType(Type type)
     if (knownTypes.Contains(type))
     {
         return true;
+    }
+
+    if (type.IsConstructedGenericType && type.GetGenericTypeDefinition() == typeof(Expression<>))
+    {
+        return IsKnownType(type.GetGenericArguments()[0]);
     }
 
     if (type.IsConstructedGenericType)
@@ -407,4 +432,19 @@ bool IsFunctionType(Type type)
     return type.Namespace == "System" && (type.Name.StartsWith("Func`") ||
                                           type.Name.StartsWith("Action`") ||
                                           type.Name == "Action");
+}
+
+internal class TsType
+{
+    public TsType(Type type)
+    {
+        Type = type;
+    }
+
+    public Type Type { get; set; }
+    public bool MakeGenericsOptional { get; set; }
+    public Type? ExtensionsSource { get; set; }
+    public List<Type> ExtensionTargetTypes { get; set; } = new();
+    public List<Type> ImplementedInterfaces { get; set; } = new();
+    public List<MethodBase> SuppressedMethods { get; set; } = new();
 }
