@@ -128,6 +128,12 @@ function transpileExpression(
             writer.append("(");
             ts.forEachChild(node, visitNode);
             writer.append(")");
+        } else if (ts.isConditionalExpression(node)) {
+            visitNode(node.condition);
+            writer.append("?");
+            visitNode(node.whenTrue);
+            writer.append(":");
+            visitNode(node.whenFalse);
         } else if (ts.isCallExpression(node)) {
             visitNode(node.expression);
             writer.append("(");

@@ -133,10 +133,9 @@ export function transpileTypeReference(
             if (nullTypes.length !== 1 || otherTypes.length !== 1) {
                 throw new TranspilationError(
                     node,
-                    "Only union types of the form `T | null` are supported."
+                    "Only union types of the form `T | null` are supported. Are you trying to define an anonymous type?"
                 );
             }
-            Promise.resolve;
             nodeToCSharpType(otherTypes[0]);
             writer.append(`?`);
             return true;
