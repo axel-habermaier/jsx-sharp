@@ -1,4 +1,4 @@
-﻿/*namespace JsxSharp.Csx3;
+﻿namespace JsxSharp.Csx3;
 
 internal class div : HtmlElement
 {
@@ -69,4 +69,4 @@ public class Controller
         //  )
         //);//
     }
-}*/
+}

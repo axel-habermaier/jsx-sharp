@@ -26,7 +26,9 @@ app.UseAuthorization();
 app.UseEndpoints(endpoints => endpoints.MapControllers());
 
 Example3Module.AboutPage(app);
-QuestionnaireEditorModule.QuestionnaireEditor(app);
+
+//QuestionnaireEditorModule.QuestionnaireEditor(app);
 DirectJsx.QuestionnaireEditor(app);
+app.MapGet("/htmlSharp", () => Results.Content(JsxSharp.Csx4.Controller.Get(3), "text/html"));
 
 app.Run();

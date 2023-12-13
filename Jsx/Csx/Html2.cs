@@ -1,4 +1,4 @@
-﻿/*namespace JsxSharp.Csx2;
+﻿namespace JsxSharp.Csx2;
 
 using static Html;
 
@@ -166,4 +166,4 @@ public class Controller
         //  )
         //);//
     }
-}*/
+}

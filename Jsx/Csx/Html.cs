@@ -61,25 +61,15 @@ public static class Html
         return _element.Append("<div></div>");
     }
 
-    public record class FormProps(string method, string action, string? id = null)
-    {
-    }
+    public record class FormProps(string method, string action, string? id = null) { }
 
-    public record class ButtonProps(string type)
-    {
-    }
+    public record class ButtonProps(string type) { }
 
-    public record class AnchorProps(string href)
-    {
-    }
+    public record class AnchorProps(string href) { }
 
-    public record class ImageProps(string src)
-    {
-    }
+    public record class ImageProps(string src) { }
 
-    public record class HtmlProps(string? id = null)
-    {
-    }
+    public record class HtmlProps(string? id = null) { }
 }
 
 public class HtmlElement
@@ -90,6 +80,7 @@ public class HtmlElement
     }
 
     public static implicit operator HtmlElement(string s) => null;
+
     public static implicit operator HtmlElement(int s) => null;
 }
 
@@ -105,9 +96,7 @@ public class HtmlElement
 //     ))}
 // </ul>
 
-public record class Questionnaire(int id, string questions)
-{
-}
+public record class Questionnaire(int id, string questions) { }
 
 public class Controller
 {
@@ -118,33 +107,35 @@ public class Controller
             return null;
         }
 
-        return div(null,
-            p(null, "PLANFOX: "),
-            header
-        );
+        return div(null, p(null, "PLANFOX: "), header);
     }
 
     public HtmlElement Get(int id)
     {
         var questionnaires = new List<Questionnaire>();
 
-        return div(null,
+        return div(
+            null,
             p(null, "Hallo Welt"),
             img(new(src: "img.png")),
-            form(new(id: "form1", method: "post", action: "/editor/add"),
+            form(
+                new(id: "form1", method: "post", action: "/editor/add"),
                 button(new(type: "submit"))
             ),
-            ul(null, questionnaires.Select(q =>
-                li(null,
-                    a(new AnchorProps(href: $"svelte/{q.id}"), q.id),
-                    id == q.id ? b(null, "(current)") : null,
-                    Test(showHeader: true, header: h3(null, "Head"))
+            ul(
+                null,
+                questionnaires.Select(
+                    q =>
+                        li(
+                            null,
+                            a(new AnchorProps(href: $"svelte/{q.id}"), q.id),
+                            id == q.id ? b(null, "(current)") : null,
+                            Test(showHeader: true, header: h3(null, "Head"))
+                        )
                 )
-            ))
+            )
         );
     }
 
-    public record class TestProps(bool showHeader, HtmlElement header)
-    {
-    }
+    public record class TestProps(bool showHeader, HtmlElement header) { }
 }
